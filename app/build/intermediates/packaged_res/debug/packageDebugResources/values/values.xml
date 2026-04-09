@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <color name="deep_orange">#FFFF5722</color>
+    <color name="deep_orange_dark">#FFE64A19</color>
+    <color name="foreground_gray">#FF888888</color>
+    <color name="gray_background">#FFFFFFFF</color>
+    <string name="app_name">Whaled</string>
+    <style name="Theme.WLEDController" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:forceDarkAllowed" ns1:targetApi="q">false</item>
+    </style>
+</resources>

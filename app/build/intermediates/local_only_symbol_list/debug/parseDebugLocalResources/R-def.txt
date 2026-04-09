@@ -1,0 +1,20 @@
+R_DEF: Internal format may change without notice
+local
+color deep_orange
+color deep_orange_dark
+color foreground_gray
+color gray_background
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+drawable ic_launcher_foreground_backup
+drawable ic_launcher_foreground_gray
+drawable ic_launcher_foreground_white
+drawable logo
+drawable wled_logo_akemi
+mipmap ic_launcher
+mipmap ic_launcher_foreground
+mipmap ic_launcher_round
+string app_name
+style Theme.WLEDController
+xml backup_rules
+xml data_extraction_rules

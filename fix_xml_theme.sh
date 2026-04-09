@@ -1,0 +1,15 @@
+#!/bin/bash
+cat << 'INNER_EOF' > app/src/main/res/values/themes.xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- En définissant un thème de base SOMBRE (Material au lieu de Material.Light), 
+         le "Dark Mode" forcé de PixelOS / Android va se désactiver automatiquement 
+         car il pensera que l'app est déjà sombre, laissant nos couleurs intactes ! -->
+    <style name="Theme.WLEDController" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="q">false</item>
+    </style>
+</resources>
+INNER_EOF
