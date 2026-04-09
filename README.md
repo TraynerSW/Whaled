@@ -1,6 +1,6 @@
 # Whaled 🐋
 
-**Whaled** (basé sur l'interface WLED) est une application Android moderne développée en **Kotlin** et **Jetpack Compose**, conçue pour contrôler vos appareils compatibles avec WLED. 
+**Whaled** (basé sur le projet [WLED](https://github.com/wled/WLED)) est une application Android moderne développée en **Kotlin** et **Jetpack Compose**, conçue pour contrôler vos appareils compatibles avec WLED. 
 
 Ce projet intègre des composants **Material Design 3 expressive (Material You)**.
 
