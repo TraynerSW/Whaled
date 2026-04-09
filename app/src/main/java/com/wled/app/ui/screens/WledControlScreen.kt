@@ -127,12 +127,7 @@ fun WledControlScreen(
         Color(255, 87, 34)
     }
     
-    var selectedHue by remember { mutableFloatStateOf(0f) }
-    var selectedSaturation by remember { mutableFloatStateOf(1f) }
-    var selectedValue by remember { mutableFloatStateOf(1f) }
-    var initialized by remember { mutableStateOf(false) }
-    
-    if (!initialized) {
+    val initialHsv = remember(currentColor) {
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(
             android.graphics.Color.rgb(
@@ -142,11 +137,18 @@ fun WledControlScreen(
             ),
             hsv
         )
-        selectedHue = hsv[0]
-        selectedSaturation = hsv[1]
-        selectedValue = hsv[2]
-        initialized = true
+        hsv
     }
+    
+    var selectedHue by remember { mutableFloatStateOf(initialHsv[0]) }
+    var selectedSaturation by remember { mutableFloatStateOf(initialHsv[1]) }
+    var selectedValue by remember { mutableFloatStateOf(initialHsv[2]) }
+    
+    // We don't want to trigger network request just because the screen was opened
+    // or when polling updates the color from another device.
+    // Instead of LaunchedEffect(selectedHue), we should use a flag that ensures we only
+    // update when the user drags the wheel.
+    var isUserDraggingColor by remember { mutableStateOf(false) }
     
     val baseColor = ensureColorNotTooDark(currentColor)
 
@@ -154,13 +156,17 @@ fun WledControlScreen(
         android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, selectedValue))
     )
 
-    LaunchedEffect(selectedHue, selectedSaturation) {
-        if (initialized) {
-            delay(100) // Throttle network requests
-            val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, 1f))
-            repository.setColor(device.ip, colorInt)
+    // Synchronize UI sliders with actual colors when polling changes it externally, 
+    // unless the user is currently interacting.
+    LaunchedEffect(initialHsv[0], initialHsv[1], initialHsv[2]) {
+        if (!isUserDraggingColor) {
+            selectedHue = initialHsv[0]
+            selectedSaturation = initialHsv[1]
+            selectedValue = initialHsv[2]
         }
     }
+
+    // Network requests are now sent directly via onHueChange and onSaturationChange
     
     var showEditNameDialog by remember { mutableStateOf(false) }
     var editedName by remember { mutableStateOf(device.name) }
@@ -288,9 +294,10 @@ fun WledControlScreen(
 
     if (segmentToEdit != null || isAddingSegment) {
         val segment = segmentToEdit
+        val maxLeds = device.info?.ledsCount?.toString() ?: "10"
         var name by remember { mutableStateOf(segment?.name ?: "") }
         var start by remember { mutableStateOf(segment?.start?.toString() ?: "0") }
-        var stop by remember { mutableStateOf(segment?.stop?.toString() ?: "10") }
+        var stop by remember { mutableStateOf(segment?.stop?.toString() ?: maxLeds) }
 
         AlertDialog(
             onDismissRequest = {
@@ -501,10 +508,22 @@ fun WledControlScreen(
                     ) {
                         ColorWheel(
                             hue = selectedHue,
-                            onHueChange = { selectedHue = it },
+                            onHueChange = { 
+                                selectedHue = it
+                                isUserDraggingColor = true 
+                                val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(it, selectedSaturation, 1f))
+                                repository.setColor(device.ip, colorInt)
+                            },
                             saturation = selectedSaturation,
-                            onSaturationChange = { selectedSaturation = it },
-                            modifier = Modifier.size(200.dp)
+                            onSaturationChange = { 
+                                selectedSaturation = it
+                                isUserDraggingColor = true 
+                                val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, it, 1f))
+                                repository.setColor(device.ip, colorInt)
+                            },
+                            modifier = Modifier.size(200.dp),
+                            onInteractionStart = { isUserDraggingColor = true },
+                            onInteractionEnd = { isUserDraggingColor = false }
                         )
                     }
 
@@ -543,6 +562,9 @@ fun WledControlScreen(
                                         selectedHue = hsv[0]
                                         selectedSaturation = hsv[1]
                                         selectedValue = hsv[2]
+                                        
+                                        val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], 1f))
+                                        repository.setColor(device.ip, colorInt)
                                     }
                             )
                         }
@@ -583,6 +605,9 @@ fun WledControlScreen(
                                             selectedHue = hsv[0]
                                             selectedSaturation = hsv[1]
                                             selectedValue = hsv[2]
+                                            
+                                            val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], 1f))
+                                            repository.setColor(device.ip, colorInt)
                                         },
                                         onLongClick = {
                                             colorToDelete = color
@@ -773,6 +798,7 @@ fun WledControlScreen(
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
+                                        .clickable { segmentToEdit = segment }
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(16.dp).fillMaxWidth(),
@@ -801,11 +827,13 @@ fun WledControlScreen(
                             Button(
                                 onClick = { isAddingSegment = true },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = baseColor)
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.6f)
+                                )
                             ) {
-                                Icon(Icons.Default.Add, contentDescription = "Ajouter")
+                                Icon(Icons.Default.Add, contentDescription = "Ajouter", tint = Color.White)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Ajouter un segment")
+                                Text("Ajouter un segment", color = Color.White)
                             }
                         }
                     }

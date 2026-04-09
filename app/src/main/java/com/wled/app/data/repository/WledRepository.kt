@@ -124,6 +124,19 @@ class WledRepository(private val context: Context) {
                     if (state != null) {
                         _deviceStates.value = _deviceStates.value + (device.ip to state)
                         saveDeviceState(device.ip, state.isOn, state.brightness)
+                        
+                        // Sync real-time color variable with the fetched state
+                        val firstColor = state.segments.firstOrNull()?.colors?.firstOrNull()
+                        if (firstColor != null) {
+                            val colorInt = android.graphics.Color.rgb(firstColor.r, firstColor.g, firstColor.b)
+                            val currentRealtime = _realtimeColors.value[device.ip]
+                            if (currentRealtime != colorInt) {
+                                val updatedColors = _realtimeColors.value.toMutableMap()
+                                updatedColors[device.ip] = colorInt
+                                _realtimeColors.value = updatedColors
+                                updateDeviceColor(device.ip, colorInt)
+                            }
+                        }
                     }
                 } catch (e: Exception) {}
             }
@@ -242,9 +255,9 @@ class WledRepository(private val context: Context) {
         val device = _selectedDevice.value ?: return
         val currentState = _deviceStates.value[device.ip] ?: return
 
-        // Throttle state updates during drag to avoid heavy UI stutter (max 10 fps)
+        // Throttle state updates during drag to avoid heavy UI stutter (max 100 fps)
         val currentTime = System.currentTimeMillis()
-        if (!isDragging || currentTime - lastBrightnessSentTime > 100) {
+        if (!isDragging || currentTime - lastBrightnessSentTime > 10) {
             val newDeviceStates = _deviceStates.value.mapValues { (ip, state) ->
                 if (ip == device.ip) {
                     state.copy(brightness = brightness)
@@ -265,17 +278,19 @@ class WledRepository(private val context: Context) {
                 saveDeviceState(device.ip, currentState.isOn, brightness)
             }
         } else {
-            // Throttle API calls while dragging (max 10 per second)
+            // Throttle API calls while dragging
             if (setBrightnessJob?.isActive != true) {
                 setBrightnessJob = scope.launch {
                     withContext(Dispatchers.IO) {
                         apiService.setBrightness(device.ip, device.port, brightness, currentState.isOn)
                     }
-                    kotlinx.coroutines.delay(100) // Keep the job active for 100ms to block new calls
+                    kotlinx.coroutines.delay(10) // Keep the job active for 10ms to block new calls
                 }
             }
         }
     }
+
+    private val setColorJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
 
     fun setColor(ip: String, color: Int) {
         val r = (color shr 16) and 0xFF
@@ -285,8 +300,9 @@ class WledRepository(private val context: Context) {
         val brightness = currentState?.brightness ?: 128
         val currentlyOn = currentState?.isOn ?: true
 
-        scope.launch {
-            delay(100)
+        setColorJobs[ip]?.cancel()
+        setColorJobs[ip] = scope.launch {
+            delay(10)
             withContext(Dispatchers.IO) {
                 apiService.setColor(ip, 80, r, g, b, brightness, currentlyOn)
             }
@@ -296,9 +312,9 @@ class WledRepository(private val context: Context) {
     }
 
     private fun isSynchronized(sourceIp: String, targetIp: String): Boolean {
-        // All devices are considered synchronized in this simple implementation
-        // In a more complex setup, you'd check WLED's group settings
-        return true
+        // We do not assume all devices are synchronized by default anymore,
+        // because it overrides colors for completely separate devices.
+        return false
     }
 
     fun updateRealtimeColor(ip: String, brightness: Int, color: Int) {

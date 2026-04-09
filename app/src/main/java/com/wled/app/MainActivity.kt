@@ -17,9 +17,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
 import androidx.core.view.WindowCompat
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Vibrator
+import android.os.VibrationEffect
+import android.os.Build
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import com.wled.app.data.repository.WledRepository
 import com.wled.app.data.service.UdpListenerService
 import com.wled.app.ui.screens.HomeScreen
@@ -60,24 +72,47 @@ class MainActivity : ComponentActivity() {
         setContent {
             var currentTheme by remember { mutableStateOf(themeRepository.currentTheme) }
             var selectedDevice by remember { mutableStateOf<com.wled.app.data.model.WledDevice?>(null) }
+            
+            val context = LocalContext.current
+            val safeHapticFeedback = remember {
+                object : HapticFeedback {
+                    override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) {
+                        try {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.VIBRATE) == PackageManager.PERMISSION_GRANTED) {
+                                val v = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                                if (v != null && v.hasVibrator()) {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                        v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                    } else {
+                                        v.vibrate(VibrationEffect.createOneShot(5, 100))
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Ignorer les erreurs de vibration
+                        }
+                    }
+                }
+            }
 
             WLEDTheme(theme = currentTheme, dynamicColor = true) {
-                // Background now purely relies on the Theme definition!
-                val bgModifier = Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(
-                        listOf(
-                            MaterialTheme.colorScheme.background,
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.99f)
+                CompositionLocalProvider(LocalHapticFeedback provides safeHapticFeedback) {
+                    // Background now purely relies on the Theme definition!
+                    val bgModifier = Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.background,
+                                MaterialTheme.colorScheme.background.copy(alpha = 0.99f)
+                            )
                         )
                     )
-                )
 
-                Surface(
-                    modifier = bgModifier,
-                    color = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onBackground
-                ) {
-                    val navController = rememberNavController()
+                    Surface(
+                        modifier = bgModifier,
+                        color = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.onBackground
+                    ) {
+                        val navController = rememberNavController()
 
                     NavHost(
                         navController = navController,
@@ -140,6 +175,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+                }
                 }
             }
         }

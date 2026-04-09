@@ -177,23 +177,28 @@ fun PowerToggle(
         }
     }
 
-    val darkLedColor = androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.6f)
+    val darkLedColor = androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.65f)
+    val lightLedColor = androidx.compose.ui.graphics.lerp(baseColor, Color.White, 0.9f)
     
-    val switchColors = if (theme == AppTheme.LIGHT) {
-        SwitchDefaults.colors(
-            checkedThumbColor = darkLedColor,
-            uncheckedThumbColor = Color.White,
-            checkedTrackColor = baseColor,
-            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    } else {
-        SwitchDefaults.colors(
-            checkedThumbColor = darkLedColor,
-            uncheckedThumbColor = Color(0xFFB0B0B0),
-            checkedTrackColor = baseColor,
-            uncheckedTrackColor = Color(0xFF303030)
-        )
-    }
+    val thumbColor = if (theme == AppTheme.LIGHT) lightLedColor else darkLedColor
+    val offTrackColor = if (theme == AppTheme.LIGHT) 
+        androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.3f) 
+    else 
+        androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.8f)
+        
+    val offThumbColor = if (theme == AppTheme.LIGHT)
+        androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.5f)
+    else
+        androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.5f)
+
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = thumbColor,
+        checkedTrackColor = baseColor,
+        checkedBorderColor = Color.Transparent,
+        uncheckedThumbColor = offThumbColor,
+        uncheckedTrackColor = offTrackColor,
+        uncheckedBorderColor = baseColor.copy(alpha = 0.5f)
+    )
 
     Switch(
         checked = isOn,
@@ -284,7 +289,9 @@ fun BrightnessSlider(
         colors = SliderDefaults.colors(
             thumbColor = baseColor,
             activeTrackColor = baseColor,
-            inactiveTrackColor = baseColor.copy(alpha = 0.2f)
+            inactiveTrackColor = baseColor.copy(alpha = 0.3f),
+            activeTickColor = baseColor,
+            inactiveTickColor = baseColor.copy(alpha = 0.3f)
         )
     )
 }
@@ -321,14 +328,17 @@ fun DeviceCard(
     val cardBackgroundColor = when {
         !isOnline -> Color.Gray.copy(alpha = 0.3f)
         isOled -> Color.Transparent
-        theme == AppTheme.LIGHT -> androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.6f)
-        else -> baseColor.copy(alpha = 0.15f)
+        theme == AppTheme.LIGHT -> androidx.compose.ui.graphics.lerp(baseColor, Color.Black, 0.75f)
+        else -> baseColor.copy(alpha = 0.08f)
     }
     
         Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 3.dp)
+            .then(
+                if (isOled) Modifier.border(1.dp, baseColor, RoundedCornerShape(24.dp)) else Modifier
+            )
             .then(
                 if (isOnline) {
                     Modifier.combinedClickable(
@@ -370,43 +380,46 @@ fun DeviceCard(
                     )
                 }
 
-                when (device.effectiveIcon) {
-                    DeviceIcon.LIGHTBULB -> Icon(
-                        imageVector = Icons.Default.Lightbulb,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    DeviceIcon.RGB_RIBBON -> Icon(
-                        imageVector = Icons.Default.Timeline,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    DeviceIcon.HOME -> Icon(
-                        imageVector = Icons.Default.Home,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    DeviceIcon.FLOWER -> Icon(
-                        imageVector = Icons.Default.LocalFlorist,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    DeviceIcon.STAR -> Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    DeviceIcon.NONE -> Icon(
-                        imageVector = Icons.Default.Lightbulb,
-                        contentDescription = null,
-                        tint = iconColor,
-                        modifier = Modifier.size(28.dp)
-                    )
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(if (isOn && isOnline) baseColor.copy(alpha = 0.2f) else Color.Transparent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when (device.effectiveIcon) {
+                        DeviceIcon.LIGHTBULB -> Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        DeviceIcon.RGB_RIBBON -> Icon(
+                            imageVector = Icons.Default.Timeline,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        DeviceIcon.HOME -> Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        DeviceIcon.FLOWER -> Icon(
+                            imageVector = Icons.Default.LocalFlorist,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        DeviceIcon.STAR -> Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = iconColor,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        DeviceIcon.NONE -> Spacer(modifier = Modifier.size(28.dp))
+                    }
                 }
                 
                 Spacer(modifier = Modifier.width(16.dp))
@@ -419,7 +432,7 @@ fun DeviceCard(
                 )
             }
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             
             BrightnessSlider(
                 brightness = state?.brightness ?: device.savedBrightness,
@@ -475,14 +488,18 @@ fun EditDeviceDialog(
                             DeviceIcon.STAR -> Icons.Default.Star
                             DeviceIcon.NONE -> Icons.Default.Lightbulb
                         }
-                        Icon(
-                            imageVector = iconVector,
-                            contentDescription = null,
-                            tint = if (selectedIcon == icon) baseColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
+                        if (icon != DeviceIcon.NONE) {
+                            Icon(
+                                imageVector = iconVector,
+                                contentDescription = null,
+                                tint = if (selectedIcon == icon) baseColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.size(24.dp))
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = icon.name,
+                            text = icon.iconName,
                             color = if (selectedIcon == icon) baseColor else MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -523,33 +540,51 @@ fun ColorWheel(
     onHueChange: (Float) -> Unit,
     saturation: Float,
     onSaturationChange: (Float) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInteractionStart: () -> Unit = {},
+    onInteractionEnd: () -> Unit = {}
 ) {
     var isDragging by remember { mutableStateOf(false) }
 
     Canvas(
         modifier = modifier
             .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    val center = Offset(size.width / 2f, size.height / 2f)
-                    val dx = offset.x - center.x
-                    val dy = offset.y - center.y
-                    val radius = minOf(size.width, size.height) / 2f
-                    val distance = hypot(dx, dy)
-                    
-                    if (distance <= radius) {
-                        var angle = atan2(dy, dx) * 180f / PI.toFloat()
-                        if (angle < 0) angle += 360f
-                        onHueChange(angle)
-                        onSaturationChange((distance / radius).coerceIn(0f, 1f))
+                detectTapGestures(
+                    onPress = {
+                        onInteractionStart()
+                        tryAwaitRelease()
+                        onInteractionEnd()
+                    },
+                    onTap = { offset ->
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        val dx = offset.x - center.x
+                        val dy = offset.y - center.y
+                        val radius = minOf(size.width, size.height) / 2f
+                        val distance = hypot(dx, dy)
+                        
+                        if (distance <= radius) {
+                            var angle = atan2(dy, dx) * 180f / PI.toFloat()
+                            if (angle < 0) angle += 360f
+                            onHueChange(angle)
+                            onSaturationChange((distance / radius).coerceIn(0f, 1f))
+                        }
                     }
-                }
+                )
             }
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { isDragging = true },
-                    onDragEnd = { isDragging = false },
-                    onDragCancel = { isDragging = false }
+                    onDragStart = { 
+                        isDragging = true
+                        onInteractionStart() 
+                    },
+                    onDragEnd = { 
+                        isDragging = false
+                        onInteractionEnd() 
+                    },
+                    onDragCancel = { 
+                        isDragging = false
+                        onInteractionEnd() 
+                    }
                 ) { change, _ ->
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val dx = change.position.x - center.x
@@ -580,6 +615,16 @@ fun ColorWheel(
 
         drawCircle(
             brush = Brush.sweepGradient(sweepColors, center = center),
+            radius = radius,
+            center = center
+        )
+        
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(Color.White, Color.White.copy(alpha = 0f)),
+                center = center,
+                radius = radius
+            ),
             radius = radius,
             center = center
         )

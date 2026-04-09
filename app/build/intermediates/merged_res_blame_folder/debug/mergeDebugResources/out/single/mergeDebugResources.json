@@ -1,59 +1,11 @@
 [
     {
-        "merged": "com.wled.app-debug-56:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
-        "source": "com.wled.app-main-58:/mipmap-xxxhdpi/ic_launcher_round.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-anydpi-v26/ic_launcher_round.xml"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-hdpi_ic_launcher.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-hdpi/ic_launcher.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground_white.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground_white.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-mdpi_ic_launcher_round.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-mdpi/ic_launcher_round.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/xml_data_extraction_rules.xml.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/xml/data_extraction_rules.xml"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-anydpi-v26/ic_launcher.xml"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground_gray.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground_gray.png"
-    },
-    {
-        "merged": "com.wled.app-debug-56:/mipmap-xxxhdpi_ic_launcher.png.flat",
-        "source": "com.wled.app-main-58:/mipmap-xxxhdpi/ic_launcher.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_background.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_background.png"
-    },
-    {
-        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground_backup.png.flat",
-        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground_backup.png"
-    },
-    {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-xxxhdpi_ic_launcher_round.png.flat",
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-xxxhdpi/ic_launcher_round.png"
     },
     {
-        "merged": "com.wled.app-debug-56:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "com.wled.app-main-58:/mipmap-anydpi-v26/ic_launcher_round.xml"
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-anydpi-v26/ic_launcher_round.xml"
     },
     {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_logo.png.flat",
@@ -64,20 +16,40 @@
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-mdpi/ic_launcher.png"
     },
     {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-hdpi_ic_launcher.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-hdpi/ic_launcher.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground_white.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground_white.png"
+    },
+    {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-xxhdpi_ic_launcher_round.png.flat",
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-xxhdpi/ic_launcher_round.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-mdpi_ic_launcher_round.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-mdpi/ic_launcher_round.png"
     },
     {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-xxxhdpi_ic_launcher.png.flat",
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-xxxhdpi/ic_launcher.png"
     },
     {
-        "merged": "com.wled.app-debug-56:/mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "com.wled.app-main-58:/mipmap-anydpi-v26/ic_launcher.xml"
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/xml_data_extraction_rules.xml.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/xml/data_extraction_rules.xml"
     },
     {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-xhdpi_ic_launcher.png.flat",
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-xhdpi/ic_launcher.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-xhdpi_ic_launcher_round.png.flat",
@@ -92,8 +64,16 @@
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-hdpi/ic_launcher_round.png"
     },
     {
-        "merged": "com.wled.app-debug-56:/mipmap-xxxhdpi_ic_launcher_foreground.png.flat",
-        "source": "com.wled.app-main-58:/mipmap-xxxhdpi/ic_launcher_foreground.png"
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground_gray.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground_gray.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_background.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_background.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/mipmap-xxxhdpi_ic_launcher_foreground.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/mipmap-xxxhdpi/ic_launcher_foreground.png"
     },
     {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/xml_backup_rules.xml.flat",
@@ -102,5 +82,9 @@
     {
         "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_wled_logo_akemi.png.flat",
         "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/wled_logo_akemi.png"
+    },
+    {
+        "merged": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-debug-56:/drawable_ic_launcher_foreground_backup.png.flat",
+        "source": "/home/trayner/.gradle/daemon/8.14.4/com.wled.app-main-58:/drawable/ic_launcher_foreground_backup.png"
     }
 ]

@@ -1,12 +1,12 @@
 package com.wled.app.data.model
 
 enum class DeviceIcon(val iconName: String) {
-    LIGHTBULB("lightbulb"),
-    RGB_RIBBON("rgb_ribbon"),
-    HOME("home"),
-    FLOWER("flower"),
-    STAR("star"),
-    NONE("none")
+    STAR("Favori"),
+    LIGHTBULB("Lampe"),
+    RGB_RIBBON("Ruban RGB"),
+    HOME("Intérieur"),
+    FLOWER("Extérieur"),
+    NONE("Aucun")
 }
 
 data class WledDevice(

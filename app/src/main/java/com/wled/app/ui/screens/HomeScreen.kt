@@ -5,6 +5,9 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -164,11 +167,19 @@ fun HomeScreen(
                     }
                 }
             } else {
+                val sortedDevices = remember(devices, repository.showOfflineLast) {
+                    devices.sortedWith(
+                        compareBy<WledDevice> { if (repository.showOfflineLast && !it.isOnline) 1 else 0 }
+                        .thenBy { it.effectiveIcon.ordinal }
+                        .thenBy { it.name.lowercase() }
+                    )
+                }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
-                    items(devices, key = { it.ip }) { device ->
+                    items(sortedDevices, key = { it.ip }) { device ->
                         val state = deviceStates[device.ip]
                         val realtimeColor = realtimeColors[device.ip]
                         val savedColor = device.color
@@ -191,8 +202,10 @@ fun HomeScreen(
                                 repository.togglePower()
                                 vibrator?.let { v ->
                                     try {
-                                        if (v.hasVibrator()) {
-                                            v.vibrate(VibrationEffect.createOneShot(10, 100))
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.VIBRATE) == PackageManager.PERMISSION_GRANTED) {
+                                            if (v.hasVibrator()) {
+                                                v.vibrate(VibrationEffect.createOneShot(10, 100))
+                                            }
                                         }
                                     } catch (e: Exception) {
                                         // Vibration not available
@@ -206,11 +219,13 @@ fun HomeScreen(
                             onHapticFeedback = {
                                 vibrator?.let { v ->
                                     try {
-                                        if (v.hasVibrator()) {
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                                v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
-                                            } else {
-                                                v.vibrate(VibrationEffect.createOneShot(3, 150))
+                                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.VIBRATE) == PackageManager.PERMISSION_GRANTED) {
+                                            if (v.hasVibrator()) {
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                                    v.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                                } else {
+                                                    v.vibrate(VibrationEffect.createOneShot(3, 150))
+                                                }
                                             }
                                         }
                                     } catch (e: Exception) {

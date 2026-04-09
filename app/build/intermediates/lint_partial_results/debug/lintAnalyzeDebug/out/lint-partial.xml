@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<incidents format="6" by="lint 8.7.3" type="partial_results">
+    <map id="UnsafeIntentLaunch">
+            <map id="unprotected">
+                <entry
+                    name="com.wled.app.MainActivity"
+                    boolean="true"/>
+            </map>
+    </map>
+    <map id="UnusedResources">
+        <location id="R.color.deep_orange"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/values/colors.xml"
+            line="3"
+            column="12"
+            startOffset="62"
+            endLine="3"
+            endColumn="30"
+            endOffset="80"/>
+        <location id="R.color.deep_orange_dark"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/values/colors.xml"
+            line="4"
+            column="12"
+            startOffset="110"
+            endLine="4"
+            endColumn="35"
+            endOffset="133"/>
+        <location id="R.color.foreground_gray"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/values/colors.xml"
+            line="6"
+            column="12"
+            startOffset="215"
+            endLine="6"
+            endColumn="34"
+            endOffset="237"/>
+        <location id="R.color.gray_background"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/values/colors.xml"
+            line="5"
+            column="12"
+            startOffset="163"
+            endLine="5"
+            endColumn="34"
+            endOffset="185"/>
+        <location id="R.drawable.ic_launcher_background"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/drawable/ic_launcher_background.png"/>
+        <location id="R.drawable.logo"
+            file="${:app*debug*MAIN*sourceProvider*0*resDir*0}/drawable/logo.png"/>
+        <entry
+            name="model"
+            string="color[deep_orange(D),deep_orange_dark(D),gray_background(D),foreground_gray(D)],drawable[ic_launcher_background(D),logo(D),wled_logo_akemi(U)],mipmap[ic_launcher(U),ic_launcher_round(U),ic_launcher_foreground(U)],string[app_name(U)],style[Theme_WLEDController(U)],xml[data_extraction_rules(U),backup_rules(U)];7^9,8^9;;;"/>
+    </map>
+
+</incidents>

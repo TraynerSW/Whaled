@@ -36,8 +36,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import android.content.pm.PackageManager
 import com.wled.app.ui.theme.AppTheme
 import kotlinx.coroutines.launch
 
@@ -59,25 +61,32 @@ fun SettingsScreen(
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    
+    val appVersion = remember {
+        try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            pInfo.versionName ?: "0.4.1"
+        } catch (e: PackageManager.NameNotFoundException) {
+            "0.4.1"
+        }
+    }
 
     var localAutoDiscovery by remember { mutableStateOf(autoDiscovery) }
     var localShowHiddenDevices by remember { mutableStateOf(showHiddenDevices) }
     var localShowOfflineLast by remember { mutableStateOf(showOfflineLast) }
 
     val isDark = currentTheme == AppTheme.DARK || currentTheme == AppTheme.OLED || (currentTheme == AppTheme.SYSTEM && isSystemInDarkTheme())
-    val switchColors = if (currentTheme == AppTheme.LIGHT) {
-        SwitchDefaults.colors(
-            checkedThumbColor = Color.White,
-            uncheckedThumbColor = Color.White,
-            checkedTrackColor = MaterialTheme.colorScheme.primary,
-            uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-    } else {
-        SwitchDefaults.colors(
-            checkedThumbColor = Color.White,
-            checkedTrackColor = MaterialTheme.colorScheme.primary
-        )
-    }
+    val darkLedColor = androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary, Color.Black, 0.65f)
+    
+    val switchColors = SwitchDefaults.colors(
+        checkedThumbColor = if (isDark) darkLedColor else Color.White,
+        checkedTrackColor = MaterialTheme.colorScheme.primary,
+        checkedBorderColor = Color.Transparent,
+        uncheckedThumbColor = if (isDark) Color.LightGray else Color.DarkGray,
+        uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f),
+        uncheckedBorderColor = Color.Gray
+    )
 
     Scaffold(
         topBar = {
@@ -223,7 +232,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyLarge
                 )
                 Text(
-                    text = "v0.4",
+                    text = "v$appVersion",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
