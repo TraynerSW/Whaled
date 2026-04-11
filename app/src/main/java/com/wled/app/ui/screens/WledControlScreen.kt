@@ -1,7 +1,11 @@
 package com.wled.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +41,12 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -46,6 +55,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.draw.scale
 import androidx.compose.material.icons.filled.Add
@@ -73,6 +83,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -167,6 +178,21 @@ fun WledControlScreen(
     // Instead of LaunchedEffect(selectedHue), we should use a flag that ensures we only
     // update when the user drags the wheel.
     var isUserDraggingColor by remember { mutableStateOf(false) }
+    var draggingJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val draggingCoroutineScope = rememberCoroutineScope()
+
+    fun notifyInteractionStart() {
+        draggingJob?.cancel()
+        isUserDraggingColor = true
+    }
+
+    fun notifyInteractionEnd() {
+        draggingJob?.cancel()
+        draggingJob = draggingCoroutineScope.launch {
+            kotlinx.coroutines.delay(500)
+            isUserDraggingColor = false
+        }
+    }
     
     val baseColor = ensureColorNotTooDark(currentColor)
 
@@ -196,10 +222,25 @@ fun WledControlScreen(
     val context = LocalContext.current
     val sharedPrefs = context.getSharedPreferences("wled_custom_colors", Context.MODE_PRIVATE)
     var showColorSettingsDialog by remember { mutableStateOf(false) }
+    var isSettingsDialogVisible by remember { mutableStateOf(false) }
+    var isSettingsDialogAnimatingOut by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showColorSettingsDialog) {
+        if (showColorSettingsDialog) {
+            isSettingsDialogVisible = true
+            isSettingsDialogAnimatingOut = false
+        } else {
+            isSettingsDialogAnimatingOut = true
+            kotlinx.coroutines.delay(200)
+            isSettingsDialogVisible = false
+        }
+    }
     var showHexInput by remember { mutableStateOf(sharedPrefs.getBoolean("show_hex", true)) }
     var showIntensitySlider by remember { mutableStateOf(sharedPrefs.getBoolean("show_intensity", true)) }
     var showCctSlider by remember { mutableStateOf(sharedPrefs.getBoolean("show_cct", true)) }
     var showRgbSliders by remember { mutableStateOf(sharedPrefs.getBoolean("show_rgb", true)) }
+    var showPresetColors by remember { mutableStateOf(sharedPrefs.getBoolean("show_preset_colors", true)) }
+    var showCustomColors by remember { mutableStateOf(sharedPrefs.getBoolean("show_custom_colors", true)) }
 
     
     var customColors by remember {
@@ -398,7 +439,7 @@ fun WledControlScreen(
     }
     
 
-    if (showColorSettingsDialog) {
+    if (isSettingsDialogVisible) {
         val basePrimary = MaterialTheme.colorScheme.primary
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(basePrimary.toArgb(), hsv)
@@ -414,51 +455,78 @@ fun WledControlScreen(
             checkedBorderColor = Color.Transparent
         )
 
-        AlertDialog(
-            onDismissRequest = { showColorSettingsDialog = false },
-            title = { Text("Curseurs") },
-            text = {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Hexadécimal")
-                        Switch(
-                            checked = showHexInput,
-                            onCheckedChange = { showHexInput = it; sharedPrefs.edit().putBoolean("show_hex", it).apply() },
-                            colors = switchColors
-                        )
+        Dialog(onDismissRequest = { showColorSettingsDialog = false }) {
+            AnimatedVisibility(
+                visible = !isSettingsDialogAnimatingOut,
+                enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.9f),
+                exit = fadeOut(tween(200)) + scaleOut(tween(200), targetScale = 0.9f)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text("Affichage", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                        
+                        Text("Curseurs", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Intensité")
+                            Switch(
+                                checked = showIntensitySlider,
+                                onCheckedChange = { showIntensitySlider = it; sharedPrefs.edit().putBoolean("show_intensity", it).apply() },
+                                colors = switchColors
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Température (CCT)")
+                            Switch(
+                                checked = showCctSlider,
+                                onCheckedChange = { showCctSlider = it; sharedPrefs.edit().putBoolean("show_cct", it).apply() },
+                                colors = switchColors
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Couleurs (RGB)")
+                            Switch(
+                                checked = showRgbSliders,
+                                onCheckedChange = { showRgbSliders = it; sharedPrefs.edit().putBoolean("show_rgb", it).apply() },
+                                colors = switchColors
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text("Boutons", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Hexadécimal")
+                            Switch(
+                                checked = showHexInput,
+                                onCheckedChange = { showHexInput = it; sharedPrefs.edit().putBoolean("show_hex", it).apply() },
+                                colors = switchColors
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Couleurs (prédéfinies)")
+                            Switch(
+                                checked = showPresetColors,
+                                onCheckedChange = { showPresetColors = it; sharedPrefs.edit().putBoolean("show_preset_colors", it).apply() },
+                                colors = switchColors
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Couleurs (personnalisées)")
+                            Switch(
+                                checked = showCustomColors,
+                                onCheckedChange = { showCustomColors = it; sharedPrefs.edit().putBoolean("show_custom_colors", it).apply() },
+                                colors = switchColors
+                            )
+                        }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Intensité")
-                        Switch(
-                            checked = showIntensitySlider,
-                            onCheckedChange = { showIntensitySlider = it; sharedPrefs.edit().putBoolean("show_intensity", it).apply() },
-                            colors = switchColors
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Température (CCT)")
-                        Switch(
-                            checked = showCctSlider,
-                            onCheckedChange = { showCctSlider = it; sharedPrefs.edit().putBoolean("show_cct", it).apply() },
-                            colors = switchColors
-                        )
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Couleurs (RGB)")
-                        Switch(
-                            checked = showRgbSliders,
-                            onCheckedChange = { showRgbSliders = it; sharedPrefs.edit().putBoolean("show_rgb", it).apply() },
-                            colors = switchColors
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showColorSettingsDialog = false }) {
-                    Text("Fermer", color = vividDarkPrimary)
                 }
             }
-        )
+        }
     }
     
     val pagerState = rememberPagerState(pageCount = { 4 })
@@ -612,26 +680,26 @@ fun WledControlScreen(
                                 hue = selectedHue,
                                 onHueChange = { 
                                     selectedHue = it
-                                    isUserDraggingColor = true 
+                                    notifyInteractionStart()
                                     val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(it, selectedSaturation, selectedValue))
                                     repository.setColor(device.ip, colorInt)
                                 },
                                 saturation = selectedSaturation,
                                 onSaturationChange = { 
                                     selectedSaturation = it
-                                    isUserDraggingColor = true 
+                                    notifyInteractionStart()
                                     val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, it, selectedValue))
                                     repository.setColor(device.ip, colorInt)
                                 },
                                 value = selectedValue,
                                 modifier = Modifier.size(280.dp),
-                                onInteractionStart = { isUserDraggingColor = true },
-                                onInteractionEnd = { isUserDraggingColor = false }
+                                onInteractionStart = { notifyInteractionStart() },
+                                onInteractionEnd = { notifyInteractionEnd() }
                             )
                             
                             IconButton(
                                 onClick = { showColorSettingsDialog = true },
-                                modifier = Modifier.align(Alignment.TopEnd)
+                                modifier = Modifier.align(Alignment.TopEnd).offset(x = 12.dp, y = -12.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
@@ -642,10 +710,9 @@ fun WledControlScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(13.dp)) // Marge après la roue
+                        Spacer(modifier = Modifier.height(if (showHexInput) 4.dp else 28.dp)) // Marge après la roue
 
                         if (showHexInput) {
-Spacer(modifier = Modifier.height(8.dp))
                             
                             // Hex input
                             var hexText by remember(displayColor) { 
@@ -669,8 +736,8 @@ Spacer(modifier = Modifier.height(8.dp))
                                             selectedSaturation = hsv[1]
                                             selectedValue = kotlin.math.sqrt(hsv[2].toDouble()).toFloat()
                                             
-                                            val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], selectedValue * selectedValue))
-                                            repository.setColor(device.ip, colorInt)
+                                            val newColorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], selectedValue * selectedValue))
+                                            repository.setColor(device.ip, newColorInt)
                                         } catch (e: Exception) {
                                             // Ignore invalid hex
                                         }
@@ -689,17 +756,18 @@ Spacer(modifier = Modifier.height(8.dp))
                             Spacer(modifier = Modifier.height(12.dp))
                         }
 
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 54.dp)) {
                                                         if (showIntensitySlider) {
                                 com.wled.app.ui.components.ColorSlider(
                                     value = selectedValue * 255f,
                                     onValueChange = { 
                                         val f = it / 255f
                                         selectedValue = f.coerceIn(0f, 1f)
-                                        isUserDraggingColor = true
+                                        notifyInteractionStart()
                                         val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, selectedValue))
                                         repository.setColor(device.ip, colorInt)
                                     },
+                                    onValueChangeFinished = { notifyInteractionEnd() },
                                     baseColor = Color.White,
                                     thumbColor = Color.White,
                                     drawFullTrackGradient = true,
@@ -712,12 +780,13 @@ com.wled.app.ui.components.ColorSlider(
                                     value = selectedCct.toFloat(),
                                     onValueChange = { 
                                         selectedCct = it.toInt()
-                                        isUserDraggingColor = true
+                                        notifyInteractionStart()
                                         repository.setWhiteTemperature(device.ip, selectedCct)
                                     },
+                                    onValueChangeFinished = { notifyInteractionEnd() },
                                     baseColor = Color.White,
                                     drawFullTrackGradient = true,
-                                    startColor = Color(0xFFFFB46B),
+                                    startColor = Color(0xFFFF8A12),
                                     endColor = Color(0xFFE3EFFF)
                                 )
                             }
@@ -725,140 +794,212 @@ com.wled.app.ui.components.ColorSlider(
 
                         Spacer(modifier = Modifier.height(17.dp))
 
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        ) {
-                            presetColors.forEach { color ->
-                                Box(
-                                    modifier = Modifier.width(35.dp).height(31.dp).clip(RoundedCornerShape(50))
-                                        .background(color)
-                                        .clickable {
-                                            val hsv = FloatArray(3)
-                                            android.graphics.Color.colorToHSV(
-                                                android.graphics.Color.rgb(
-                                                    (color.red * 255).toInt(),
-                                                    (color.green * 255).toInt(),
-                                                    (color.blue * 255).toInt()
-                                                ),
-                                                hsv
-                                            )
-                                            selectedHue = hsv[0]
-                                            selectedSaturation = hsv[1]
-                                            selectedValue = hsv[2]
-                                            
-                                            val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], 1f))
-                                            repository.setColor(device.ip, colorInt)
-                                        }
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.height(17.dp))
-
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        ) {
-                            customColors.forEach { color ->
-                                Box(
-                                    modifier = Modifier.width(35.dp).height(31.dp).clip(RoundedCornerShape(50))
-                                        .background(color)
-                                        .combinedClickable(
-                                            onClick = {
-                                                val hsv = FloatArray(3)
-                                                android.graphics.Color.colorToHSV(
-                                                    android.graphics.Color.rgb(
-                                                        (color.red * 255).toInt(),
-                                                        (color.green * 255).toInt(),
-                                                        (color.blue * 255).toInt()
-                                                    ),
-                                                    hsv
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(horizontal = 52.dp)) {
+                            if (showPresetColors) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    presetColors.forEach { color ->
+                                        Box(
+                                            modifier = Modifier
+                                                .width(42.dp)
+                                                .height(36.dp)
+                                                .clip(CircleShape)
+                                                .then(
+                                                    if (color == Color.Transparent) {
+                                                        Modifier.background(
+                                                            androidx.compose.ui.graphics.Brush.linearGradient(
+                                                                listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+                                                            )
+                                                        )
+                                                    } else if (color == Color(0xFF000000) || color == Color.Black) {
+                                                        Modifier.background(color).border(1.dp, Color.White, CircleShape)
+                                                    } else {
+                                                        Modifier.background(color)
+                                                    }
                                                 )
-                                                selectedHue = hsv[0]
-                                                selectedSaturation = hsv[1]
-                                                selectedValue = hsv[2]
-                                                
-                                                val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], 1f))
-                                                repository.setColor(device.ip, colorInt)
-                                            },
-                                            onLongClick = {
-                                                colorToDelete = color
-                                            }
-                                        )
-                                )
+                                                .clickable {
+                                                    notifyInteractionStart()
+                                                    if (color == Color.Transparent) {
+                                                        // Générer une couleur aléatoire
+                                                        val randomHue = (0..360).random().toFloat()
+                                                        val randomSat = kotlin.random.Random.nextFloat() // 0f à 1f
+                                                        // On garde l'intensité (selectedValue) actuelle
+                                                        val randomColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(randomHue, randomSat, selectedValue)))
+                                                        selectedHue = randomHue
+                                                        selectedSaturation = randomSat
+                                                        repository.setColor(device.ip, randomColor.toArgb())
+                                                    } else {
+                                                        val hsv = FloatArray(3)
+                                                        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+                                                        selectedHue = hsv[0]
+                                                        selectedSaturation = hsv[1]
+                                                        selectedValue = hsv[2].coerceAtLeast(0.1f)
+                                                        repository.setColor(device.ip, color.toArgb())
+                                                    }
+                                                    notifyInteractionEnd()
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                        }
+                                    }
+                                }
                             }
                             
-                            Box(
-                                modifier = Modifier.width(35.dp).height(31.dp).clip(RoundedCornerShape(50))
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .clickable {
-                                        val c = Color(
-                                            android.graphics.Color.HSVToColor(
-                                                floatArrayOf(selectedHue, selectedSaturation, 1f)
-                                            )
+                            if (showCustomColors) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    customColors.forEach { color ->
+                                        Box(
+                                            modifier = Modifier
+                                                .width(42.dp)
+                                                .height(36.dp)
+                                                .clip(CircleShape)
+                                                .background(color)
+                                                .combinedClickable(
+                                                    onClick = {
+                                                        notifyInteractionStart()
+                                                        val hsv = FloatArray(3)
+                                                        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+                                                        selectedHue = hsv[0]
+                                                        selectedSaturation = hsv[1]
+                                                        selectedValue = hsv[2].coerceAtLeast(0.1f)
+                                                        repository.setColor(device.ip, color.toArgb())
+                                                        notifyInteractionEnd()
+                                                    },
+                                                    onLongClick = {
+                                                        colorToDelete = color
+                                                    }
+                                                )
                                         )
-                                        val isPreset = presetColors.any { p ->
-                                            p.red == c.red && p.green == c.green && p.blue == c.blue
-                                        }
-                                        val isCustom = customColors.any { p ->
-                                            p.red == c.red && p.green == c.green && p.blue == c.blue
-                                        }
-                                        
-                                        if (!isPreset && !isCustom) {
-                                            val newColors = customColors.toMutableList()
-                                            newColors.add(c)
-                                            saveCustomColors(newColors)
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Ajouter",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .width(42.dp)
+                                            .height(36.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .clickable {
+                                                val c = Color(
+                                                    android.graphics.Color.HSVToColor(
+                                                        floatArrayOf(selectedHue, selectedSaturation, 1f)
+                                                    )
+                                                )
+                                                val isPreset = presetColors.any { p ->
+                                                    p.red == c.red && p.green == c.green && p.blue == c.blue
+                                                }
+                                                val isCustom = customColors.any { p ->
+                                                    p.red == c.red && p.green == c.green && p.blue == c.blue
+                                                }
+                                                
+                                                if (!isPreset && !isCustom) {
+                                                    val newColors = customColors.toMutableList()
+                                                    newColors.add(c)
+                                                    saveCustomColors(newColors)
+                                                }
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = "Ajouter",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(17.dp))
 
-                                                if (showRgbSliders) {
-Column(verticalArrangement = Arrangement.spacedBy(1.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                                com.wled.app.ui.components.RgbSlider(
-                                    value = (displayColor.red * 255).coerceIn(0f, 255f),
+                        if (showRgbSliders) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 52.dp)) {
+                                val rInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                val gInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                val bInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                                val rPressed by rInteraction.collectIsPressedAsState()
+                                val gPressed by gInteraction.collectIsPressedAsState()
+                                val bPressed by bInteraction.collectIsPressedAsState()
+                                
+                                val rDragged by rInteraction.collectIsDraggedAsState()
+                                val gDragged by gInteraction.collectIsDraggedAsState()
+                                val bDragged by bInteraction.collectIsDraggedAsState()
+                                
+                                val rScale by animateFloatAsState(if (rPressed) 1.5f else 1f)
+                                val gScale by animateFloatAsState(if (gPressed) 1.5f else 1f)
+                                val bScale by animateFloatAsState(if (bPressed) 1.5f else 1f)
+
+                                val rAnimValue by animateFloatAsState(
+                                    targetValue = (displayColor.red * 255f).coerceIn(0f, 255f),
+                                    animationSpec = if (rDragged) tween(0) else spring()
+                                )
+                                val gAnimValue by animateFloatAsState(
+                                    targetValue = (displayColor.green * 255f).coerceIn(0f, 255f),
+                                    animationSpec = if (gDragged) tween(0) else spring()
+                                )
+                                val bAnimValue by animateFloatAsState(
+                                    targetValue = (displayColor.blue * 255f).coerceIn(0f, 255f),
+                                    animationSpec = if (bDragged) tween(0) else spring()
+                                )
+
+                                val rColors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Color.Red, activeTrackColor = Color.Red, inactiveTrackColor = Color.Red.copy(alpha = 0.24f))
+                                val gColors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Color.Green, activeTrackColor = Color.Green, inactiveTrackColor = Color.Green.copy(alpha = 0.24f))
+                                val bColors = androidx.compose.material3.SliderDefaults.colors(thumbColor = Color.Blue, activeTrackColor = Color.Blue, inactiveTrackColor = Color.Blue.copy(alpha = 0.24f))
+                                
+                                androidx.compose.material3.Slider(
+                                    value = rAnimValue,
                                     onValueChange = { r ->
                                         val newColor = Color(r / 255f, displayColor.green, displayColor.blue)
                                         val hsv = FloatArray(3)
                                         android.graphics.Color.colorToHSV(newColor.toArgb(), hsv)
+                                        notifyInteractionStart()
                                         selectedHue = hsv[0]; selectedSaturation = hsv[1]; selectedValue = hsv[2]
                                         repository.setColor(device.ip, newColor.toArgb())
                                     },
-                                    color = Color.Red
+                                    onValueChangeFinished = { notifyInteractionEnd() },
+                                    modifier = Modifier.height(36.dp),
+                                    valueRange = 0f..255f,
+                                    colors = rColors,
+                                    interactionSource = rInteraction,
+                                    thumb = { Box(modifier = Modifier.scale(rScale).width(6.dp).height(24.dp).background(Color.Red, RoundedCornerShape(50))) }
                                 )
-                                com.wled.app.ui.components.RgbSlider(
-                                    value = (displayColor.green * 255).coerceIn(0f, 255f),
+                                androidx.compose.material3.Slider(
+                                    value = gAnimValue,
                                     onValueChange = { g ->
                                         val newColor = Color(displayColor.red, g / 255f, displayColor.blue)
                                         val hsv = FloatArray(3)
                                         android.graphics.Color.colorToHSV(newColor.toArgb(), hsv)
+                                        notifyInteractionStart()
                                         selectedHue = hsv[0]; selectedSaturation = hsv[1]; selectedValue = hsv[2]
                                         repository.setColor(device.ip, newColor.toArgb())
                                     },
-                                    color = Color.Green
+                                    onValueChangeFinished = { notifyInteractionEnd() },
+                                    modifier = Modifier.height(36.dp),
+                                    valueRange = 0f..255f,
+                                    colors = gColors,
+                                    interactionSource = gInteraction,
+                                    thumb = { Box(modifier = Modifier.scale(gScale).width(6.dp).height(24.dp).background(Color.Green, RoundedCornerShape(50))) }
                                 )
-                                com.wled.app.ui.components.RgbSlider(
-                                    value = (displayColor.blue * 255).coerceIn(0f, 255f),
+                                androidx.compose.material3.Slider(
+                                    value = bAnimValue,
                                     onValueChange = { b ->
                                         val newColor = Color(displayColor.red, displayColor.green, b / 255f)
                                         val hsv = FloatArray(3)
                                         android.graphics.Color.colorToHSV(newColor.toArgb(), hsv)
+                                        notifyInteractionStart()
                                         selectedHue = hsv[0]; selectedSaturation = hsv[1]; selectedValue = hsv[2]
                                         repository.setColor(device.ip, newColor.toArgb())
                                     },
-                                    color = Color.Blue
+                                    onValueChangeFinished = { notifyInteractionEnd() },
+                                    modifier = Modifier.height(36.dp),
+                                    valueRange = 0f..255f,
+                                    colors = bColors,
+                                    interactionSource = bInteraction,
+                                    thumb = { Box(modifier = Modifier.scale(bScale).width(6.dp).height(24.dp).background(Color.Blue, RoundedCornerShape(50))) }
                                 )
                             }
                             

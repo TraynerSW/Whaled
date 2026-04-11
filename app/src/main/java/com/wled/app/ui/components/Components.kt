@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,6 +69,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -226,6 +229,7 @@ fun PowerToggle(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrightnessSlider(
     brightness: Int,
@@ -236,30 +240,34 @@ fun BrightnessSlider(
     onHapticFeedback: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val thumbScale by animateFloatAsState(if (isPressed) 1.5f else 1f)
     var isDragging by remember { mutableStateOf(false) }
     
     // On utilise une courbe quadratique (x^2) pour que la luminosité basse soit plus précise
     // tout en évitant les valeurs nulles trop longues de la courbe cubique
-    var targetValue by remember { mutableStateOf(kotlin.math.sqrt(brightness / 255.0).toFloat()) }
+    var targetValue by remember { mutableStateOf(kotlin.math.sqrt(brightness.coerceAtLeast(1) / 255.0).toFloat()) }
     var updateJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val currentBrightness by androidx.compose.runtime.rememberUpdatedState(brightness)
     val scope = rememberCoroutineScope()
+    
+    val minTarget = remember { kotlin.math.sqrt(1.0 / 255.0).toFloat() }
 
     LaunchedEffect(Unit) {
-        targetValue = kotlin.math.sqrt(brightness / 255.0).toFloat()
+        targetValue = kotlin.math.sqrt(brightness.coerceAtLeast(1) / 255.0).toFloat()
     }
 
     LaunchedEffect(brightness) {
         if (!isDragging && updateJob == null) {
-            targetValue = kotlin.math.sqrt(brightness / 255.0).toFloat()
+            targetValue = kotlin.math.sqrt(brightness.coerceAtLeast(1) / 255.0).toFloat()
         }
     }
 
     val animatedValue by animateFloatAsState(
         targetValue = targetValue,
         label = "brightness",
-        animationSpec = spring(
-            dampingRatio = 0.65f,
+        animationSpec = if (isDragging) tween(0) else spring(
+            dampingRatio = 0.85f,
             stiffness = Spring.StiffnessMedium
         )
     )
@@ -267,14 +275,14 @@ fun BrightnessSlider(
     var lastHapticBrightness by remember { mutableStateOf(brightness) }
 
     Slider(
-        value = if (isDragging) targetValue else animatedValue,
+        value = animatedValue.coerceIn(minTarget, 1f),
         enabled = enabled,
         onValueChange = { newValue ->
             isDragging = true
             updateJob?.cancel()
             updateJob = null
             targetValue = newValue
-            val intValue = (newValue.toDouble().pow(2.0) * 255.0).roundToInt().coerceIn(0, 255)
+            val intValue = (newValue.toDouble().pow(2.0) * 255.0).roundToInt().coerceIn(1, 255)
             onBrightnessChange(intValue, true)
 
             if (onHapticFeedback != null && intValue != lastHapticBrightness) {
@@ -284,22 +292,34 @@ fun BrightnessSlider(
         },
         onValueChangeFinished = {
             isDragging = false
-            val intValue = (targetValue.toDouble().pow(2.0) * 255.0).roundToInt().coerceIn(0, 255)
+            val intValue = (targetValue.toDouble().pow(2.0) * 255.0).roundToInt().coerceIn(1, 255)
             onBrightnessChange(intValue, false)
 
             updateJob?.cancel()
             updateJob = scope.launch {
                 delay(2000)
                 updateJob = null
-                val expectedTarget = kotlin.math.sqrt(currentBrightness / 255.0).toFloat()
+                val expectedTarget = kotlin.math.sqrt(currentBrightness.coerceAtLeast(1) / 255.0).toFloat()
                 if (expectedTarget != targetValue) {
                     targetValue = expectedTarget
                 }
             }
         },
-        valueRange = 0f..1f,
+        valueRange = minTarget..1f,
         modifier = modifier.fillMaxWidth(),
         interactionSource = interactionSource,
+        thumb = { 
+            Box(
+                modifier = Modifier
+                    .scale(thumbScale)
+                    .width(6.dp)
+                    .height(33.dp)
+                    .background(
+                        if (enabled) baseColor else baseColor.copy(alpha = 0.38f), 
+                        androidx.compose.foundation.shape.RoundedCornerShape(50)
+                    )
+            ) 
+        },
         colors = SliderDefaults.colors(
             thumbColor = baseColor,
             activeTrackColor = baseColor,
@@ -315,11 +335,14 @@ fun RgbSlider(
     value: Float,
     onValueChange: (Float) -> Unit,
     color: Color,
+    onValueChangeFinished: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var targetValue by remember { mutableStateOf(value) }
     var isDragging by remember { mutableStateOf(false) }
     val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val thumbScale by animateFloatAsState(if (isPressed) 1.5f else 1f)
     
     LaunchedEffect(value) {
         if (!isDragging && value != targetValue) {
@@ -330,13 +353,13 @@ fun RgbSlider(
     val animatedValue by animateFloatAsState(
         targetValue = targetValue,
         label = "rgb",
-        animationSpec = spring(
-            dampingRatio = 0.65f,
+        animationSpec = if (isDragging) tween(0) else spring(
+            dampingRatio = 0.85f,
             stiffness = Spring.StiffnessMedium
         )
     )
     
-    val currentDisplayValue = if (isDragging) targetValue else animatedValue
+    val currentDisplayValue = animatedValue
 
     Box(
         modifier = modifier
@@ -348,7 +371,7 @@ fun RgbSlider(
         ) {
             val trackHeight = 12.dp.toPx()
             val cornerRadius = trackHeight / 2
-            val thumbRadius = 10.dp.toPx()
+            val thumbRadius = 10.dp.toPx() * thumbScale
             
             // Background track (full width, rounded)
             drawRoundRect(
@@ -372,21 +395,29 @@ fun RgbSlider(
                 )
             }
             
-            // Draw larger round thumb
+            // Draw trait thumb
+            val thumbWidth = 6.dp.toPx() * thumbScale
+            val thumbHeight = 24.dp.toPx() * thumbScale
+            val thumbCornerRadius = 3.dp.toPx() * thumbScale
             val thumbY = size.height / 2
             
+            val thumbTopLeftX = thumbX - thumbWidth / 2
+            val thumbTopLeftY = thumbY - thumbHeight / 2
+            
             // Shadow
-            drawCircle(
+            drawRoundRect(
                 color = Color.Black.copy(alpha = 0.2f),
-                radius = thumbRadius + 2.dp.toPx(),
-                center = Offset(thumbX, thumbY + 1.dp.toPx())
+                topLeft = Offset(thumbTopLeftX, thumbTopLeftY + 1.dp.toPx()),
+                size = androidx.compose.ui.geometry.Size(thumbWidth, thumbHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(thumbCornerRadius, thumbCornerRadius)
             )
             
-            // Colored circle
-            drawCircle(
+            // Colored trait
+            drawRoundRect(
                 color = color,
-                radius = thumbRadius,
-                center = Offset(thumbX, thumbY)
+                topLeft = Offset(thumbTopLeftX, thumbTopLeftY),
+                size = androidx.compose.ui.geometry.Size(thumbWidth, thumbHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(thumbCornerRadius, thumbCornerRadius)
             )
         }
         
@@ -399,6 +430,7 @@ fun RgbSlider(
             },
             onValueChangeFinished = {
                 isDragging = false
+                onValueChangeFinished?.invoke()
             },
             valueRange = 0f..255f,
             modifier = Modifier.fillMaxWidth(),
@@ -422,10 +454,14 @@ fun ColorSlider(
     drawFullTrackGradient: Boolean = false,
     interpolationCurve: (Float) -> Float = { it },
     thumbColor: Color? = null,
+    onValueChangeFinished: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var targetValue by remember { mutableStateOf(value) }
     var isDragging by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val thumbScale by animateFloatAsState(if (isPressed) 1.5f else 1f)
     
     LaunchedEffect(value) {
         if (!isDragging && value != targetValue) {
@@ -436,13 +472,13 @@ fun ColorSlider(
     val animatedValue by animateFloatAsState(
         targetValue = targetValue,
         label = "colorSlider",
-        animationSpec = spring(
-            dampingRatio = 0.65f,
+        animationSpec = if (isDragging) tween(0) else spring(
+            dampingRatio = 0.85f,
             stiffness = Spring.StiffnessMedium
         )
     )
     
-    val currentDisplayValue = if (isDragging) targetValue else animatedValue
+    val currentDisplayValue = animatedValue
 
     Box(
         modifier = modifier
@@ -454,7 +490,7 @@ fun ColorSlider(
         ) {
             val trackHeight = 12.dp.toPx()
             val cornerRadius = trackHeight / 2
-            val thumbRadius = 10.dp.toPx()
+            val thumbRadius = 10.dp.toPx() * thumbScale
             
             // Background track (full width, rounded)
             if (drawFullTrackGradient) {
@@ -524,10 +560,11 @@ fun ColorSlider(
             },
             onValueChangeFinished = {
                 isDragging = false
+                onValueChangeFinished?.invoke()
             },
             valueRange = 0f..255f,
             modifier = Modifier.fillMaxWidth(),
-            interactionSource = remember { MutableInteractionSource() },
+            interactionSource = interactionSource,
             colors = SliderDefaults.colors(
                 thumbColor = baseColor.copy(alpha = 0f),
                 activeTrackColor = baseColor.copy(alpha = 0f),
@@ -765,15 +802,18 @@ fun EditDeviceDialog(
 }
 
 val presetColors = listOf(
-    Color(0xFFFF0000), // Red
+    Color(0xFFFF0000), // Rouge
     Color(0xFFFF8000), // Orange
-    Color(0xFFFFFF00), // Yellow
-    Color(0xFF00FF00), // Green
-    Color(0xFF00FFFF), // Cyan
-    Color(0xFF0000FF), // Blue
-    Color(0xFF8000FF), // Purple
-    Color(0xFFFF00FF), // Magenta
-    Color(0xFFFFFFFF)  // White
+    Color(0xFFFFFF00), // Jaune
+    Color(0xFFE8C396), // Beige
+    Color(0xFFFFFFFF), // Blanc
+    Color(0xFF000000), // Noir
+    Color(0xFFFF00FF), // Rose (Magenta)
+    Color(0xFF8000FF), // Violet
+    Color(0xFF0000FF), // Bleu foncé
+    Color(0xFF00FFFF), // Bleu clair
+    Color(0xFF00FF00), // Vert
+    Color.Transparent  // Random
 )
 
 @Composable
@@ -796,13 +836,13 @@ fun ColorWheel(
     val animatedNx by animateFloatAsState(
         targetValue = targetNx,
         label = "nx",
-        animationSpec = if (isDragging) tween(0) else spring(dampingRatio = 1f, stiffness = 400f)
+        animationSpec = if (isDragging) tween(0) else spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)
     )
 
     val animatedNy by animateFloatAsState(
         targetValue = targetNy,
         label = "ny",
-        animationSpec = if (isDragging) tween(0) else spring(dampingRatio = 1f, stiffness = 400f)
+        animationSpec = if (isDragging) tween(0) else spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMedium)
     )
 
     Canvas(
