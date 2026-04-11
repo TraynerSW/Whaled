@@ -29,6 +29,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -70,8 +77,12 @@ class MainActivity : ComponentActivity() {
         udpListener.start()
 
         setContent {
+            val devices by repository.devices.collectAsState()
             var currentTheme by remember { mutableStateOf(themeRepository.currentTheme) }
-            var selectedDevice by remember { mutableStateOf<com.wled.app.data.model.WledDevice?>(null) }
+            var selectedDeviceIp by rememberSaveable { mutableStateOf<String?>(null) }
+            val selectedDevice = remember(devices, selectedDeviceIp) {
+                devices.find { it.ip == selectedDeviceIp }
+            }
             
             val context = LocalContext.current
             val safeHapticFeedback = remember {
@@ -116,18 +127,22 @@ class MainActivity : ComponentActivity() {
 
                     NavHost(
                         navController = navController,
-                        startDestination = "home"
+                        startDestination = "home",
+                        enterTransition = { fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 0.95f, animationSpec = tween(400)) },
+                        exitTransition = { fadeOut(animationSpec = tween(400)) + scaleOut(targetScale = 1.05f, animationSpec = tween(400)) },
+                        popEnterTransition = { fadeIn(animationSpec = tween(400)) + scaleIn(initialScale = 1.05f, animationSpec = tween(400)) },
+                        popExitTransition = { fadeOut(animationSpec = tween(400)) + scaleOut(targetScale = 0.95f, animationSpec = tween(400)) }
                     ) {
                         composable("home") {
                             HomeScreen(
                                 repository = repository,
                                 currentTheme = currentTheme,
                                 onNavigateToSettings = {
-                                    navController.navigate("settings")
+                                    navController.navigate("settings") { launchSingleTop = true }
                                 },
                                 onNavigateToWled = { device ->
-                                    selectedDevice = device
-                                    navController.navigate("wled")
+                                    selectedDeviceIp = device.ip
+                                    navController.navigate("wled") { launchSingleTop = true }
                                 }
                             )
                         }
@@ -159,7 +174,7 @@ class MainActivity : ComponentActivity() {
                                         navController.popBackStack()
                                     },
                                     onOpenFullWled = {
-                                        navController.navigate("wled_full")
+                                        navController.navigate("wled_full") { launchSingleTop = true }
                                     }
                                 )
                             }

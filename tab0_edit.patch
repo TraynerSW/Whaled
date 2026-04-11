@@ -1,0 +1,276 @@
+--- app/src/main/java/com/wled/app/ui/screens/WledControlScreen.kt
++++ app/src/main/java/com/wled/app/ui/screens/WledControlScreen.kt
+@@ -16,8 +16,11 @@
+ import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material.icons.filled.Check
+ import androidx.compose.material.icons.filled.Close
+ import androidx.compose.material.icons.filled.Delete
+@@ -38,8 +41,7 @@
+ import androidx.compose.ui.draw.scale
+ import androidx.compose.material.icons.filled.Add
+ import androidx.compose.material3.Button
+ import androidx.compose.material3.ButtonDefaults
+-import androidx.compose.foundation.lazy.grid.GridCells
+-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+-import androidx.compose.foundation.lazy.grid.items
++import androidx.compose.foundation.layout.ExperimentalLayoutApi
++import androidx.compose.foundation.layout.FlowRow
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+@@ -95,7 +97,7 @@
+ import com.wled.app.ui.components.presetColors
+ import kotlinx.coroutines.delay
+ 
+-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
++@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+ @Composable
+ fun WledControlScreen(
+@@ -144,6 +146,7 @@
+     var selectedHue by remember { mutableFloatStateOf(initialHsv[0]) }
+     var selectedSaturation by remember { mutableFloatStateOf(initialHsv[1]) }
+     var selectedValue by remember { mutableFloatStateOf(initialHsv[2]) }
++    var selectedCct by remember { mutableIntStateOf(deviceState?.segments?.firstOrNull()?.cct ?: 127) }
+     
+     // We don't want to trigger network request just because the screen was opened
+     // or when polling updates the color from another device.
+@@ -163,6 +166,7 @@
+             selectedHue = initialHsv[0]
+             selectedSaturation = initialHsv[1]
+             selectedValue = initialHsv[2]
++            selectedCct = deviceState?.segments?.firstOrNull()?.cct ?: 127
+         }
+     }
+@@ -496,15 +500,16 @@
+                 modifier = Modifier.fillMaxSize()
+             ) { targetTab ->
+-                Column(
+-                    modifier = Modifier.fillMaxSize(),
+-                    horizontalAlignment = Alignment.CenterHorizontally
+-                ) {
+                     when (targetTab) {
+                 0 -> {
++                Column(
++                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
++                    horizontalAlignment = Alignment.CenterHorizontally
++                ) {
+                     Spacer(modifier = Modifier.height(4.dp))
+ 
+                     Box(
+                         modifier = Modifier.size(220.dp),
+                         contentAlignment = Alignment.Center
+                     ) {
+@@ -528,21 +533,72 @@
+                         )
+                     }
+ 
+-                    Spacer(modifier = Modifier.height(16.dp))
++                    Spacer(modifier = Modifier.height(24.dp))
++
++                    // Sliders block
++                    Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
++                        com.wled.app.ui.components.ColorSlider(
++                            value = selectedValue * 255f,
++                            onValueChange = { 
++                                selectedValue = it / 255f
++                                isUserDraggingColor = true
++                                val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, selectedValue))
++                                repository.setColor(device.ip, colorInt)
++                            },
++                            baseColor = displayColor,
++                            drawFullTrackGradient = true,
++                            startColor = Color.Black,
++                            endColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, 1f))),
++                            interpolationCurve = { fraction -> kotlin.math.sqrt(fraction.toDouble()).toFloat() }
++                        )
++                        com.wled.app.ui.components.ColorSlider(
++                            value = selectedCct.toFloat(),
++                            onValueChange = { 
++                                selectedCct = it.toInt()
++                                isUserDraggingColor = true
++                                repository.setWhiteTemperature(device.ip, selectedCct)
++                            },
++                            baseColor = Color.White,
++                            drawFullTrackGradient = true,
++                            startColor = Color(0xFFFFB46B), // Warm orange
++                            endColor = Color(0xFFE3EFFF) // Cool white
++                        )
++                        com.wled.app.ui.components.RgbSlider(
++                            value = (displayColor.red * 255).coerceIn(0f, 255f),
++                            onValueChange = { r ->
++                                val newColor = Color(r / 255f, displayColor.green, displayColor.blue)
++                                val hsv = FloatArray(3)
++                                android.graphics.Color.colorToHSV(newColor.toArgb(), hsv)
++                                selectedHue = hsv[0]; selectedSaturation = hsv[1]; selectedValue = hsv[2]
++                                repository.setColor(device.ip, newColor.toArgb())
++                            },
++                            color = Color.Red
++                        )
++                        com.wled.app.ui.components.RgbSlider(
++                            value = (displayColor.green * 255).coerceIn(0f, 255f),
++                            onValueChange = { g ->
++                                val newColor = Color(displayColor.red, g / 255f, displayColor.blue)
++                                val hsv = FloatArray(3)
++                                android.graphics.Color.colorToHSV(newColor.toArgb(), hsv)
++                                selectedHue = hsv[0]; selectedSaturation = hsv[1]; selectedValue = hsv[2]
++                                repository.setColor(device.ip, newColor.toArgb())
++                            },
++                            color = Color.Green
++                        )
++                        com.wled.app.ui.components.RgbSlider(
++                            value = (displayColor.blue * 255).coerceIn(0f, 255f),
++                            onValueChange = { b ->
++                                val newColor = Color(displayColor.red, displayColor.green, b / 255f)
++                                val hsv = FloatArray(3)
++                                android.graphics.Color.colorToHSV(newColor.toArgb(), hsv)
++                                selectedHue = hsv[0]; selectedSaturation = hsv[1]; selectedValue = hsv[2]
++                                repository.setColor(device.ip, newColor.toArgb())
++                            },
++                            color = Color.Blue
++                        )
++                    }
++
++                    Spacer(modifier = Modifier.height(24.dp))
+ 
+                     Text(
+                         text = "Couleurs prédéfinies",
+@@ -550,13 +606,12 @@
+                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                     )
+ 
+-                    Spacer(modifier = Modifier.height(8.dp))
++                    Spacer(modifier = Modifier.height(16.dp))
+ 
+-                    LazyVerticalGrid(
+-                        columns = GridCells.Fixed(9),
++                    FlowRow(
+                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                         verticalArrangement = Arrangement.spacedBy(6.dp),
+                         modifier = Modifier.weight(1f)
+                     ) {
+-                        items(presetColors) { color ->
++                        presetColors.forEach { color ->
+                             Box(
+@@ -570,30 +625,27 @@
+                                         selectedSaturation = hsv[1]
+                                         selectedValue = hsv[2]
+                                         
+                                         val colorInt = android.graphics.Color.HSVToColor(floatArrayOf(hsv[0], hsv[1], 1f))
+                                         repository.setColor(device.ip, colorInt)
+                                     }
+                             )
+                         }
++                    }
+                         
+-                        item(span = { GridItemSpan(9) }) {
+-                            Spacer(modifier = Modifier.height(16.dp))
+-                        }
++                    Spacer(modifier = Modifier.height(24.dp))
+                         
+-                        item(span = { GridItemSpan(9) }) {
+-                            Text(
+-                                text = "Couleurs personnalisées",
+-                                style = MaterialTheme.typography.labelMedium,
+-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+-                            )
+-                        }
++                    Text(
++                        text = "Couleurs personnalisées",
++                        style = MaterialTheme.typography.labelMedium,
++                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
++                    )
+ 
+-                        item(span = { GridItemSpan(9) }) {
+-                            Spacer(modifier = Modifier.height(2.dp))
+-                        }
++                    Spacer(modifier = Modifier.height(16.dp))
+ 
+-                        items(customColors) { color ->
++                    FlowRow(
++                        horizontalArrangement = Arrangement.spacedBy(6.dp),
++                        verticalArrangement = Arrangement.spacedBy(6.dp),
++                        modifier = Modifier.weight(1f)
++                    ) {
++                        customColors.forEach { color ->
+                             Box(
+@@ -616,10 +668,8 @@
+                                     )
+                             )
+                         }
+                         
+-                        item {
+-                            Box(
+-                                modifier = Modifier
+-                                    .size(32.dp)
+-                                    .clip(CircleShape)
+-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+-                                    .clickable {
++                        Box(
++                            modifier = Modifier
++                                .size(32.dp)
++                                .clip(CircleShape)
++                                .background(MaterialTheme.colorScheme.surfaceVariant)
++                                .clickable {
+@@ -641,12 +691,12 @@
+                                 contentAlignment = Alignment.Center
+-                            ) {
+-                                Icon(
+-                                    Icons.Default.Add,
+-                                    contentDescription = "Ajouter",
+-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+-                                    modifier = Modifier.size(20.dp)
+-                                )
+-                            }
+                         }
++                            Icon(
++                                Icons.Default.Add,
++                                contentDescription = "Ajouter",
++                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
++                                modifier = Modifier.size(20.dp)
++                            )
++                        }
++                    }
++                    
++                    Spacer(modifier = Modifier.height(24.dp))
+                     }
+-                }
+                 1 -> {
++                Column(
++                    modifier = Modifier.fillMaxSize(),
++                    horizontalAlignment = Alignment.CenterHorizontally
++                ) {
+                     var effectSearchQuery by remember { mutableStateOf("") }
+@@ -707,6 +757,7 @@
+                             }
+                         }
+                     }
++                }
+                 }
+                 2 -> {
++                Column(
++                    modifier = Modifier.fillMaxSize(),
++                    horizontalAlignment = Alignment.CenterHorizontally
++                ) {
+                     Spacer(modifier = Modifier.height(8.dp))
+@@ -835,6 +886,7 @@
+                             }
+                         }
+                     }
++                }
+                 }
+                 3 -> {
++                Column(
++                    modifier = Modifier.fillMaxSize(),
++                    horizontalAlignment = Alignment.CenterHorizontally
++                ) {
+                     var presetSearchQuery by remember { mutableStateOf("") }
+@@ -899,6 +951,7 @@
+                             }
+                         }
+                     }
++                }
+                 }
+             }

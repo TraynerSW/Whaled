@@ -14,9 +14,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -57,6 +59,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,11 +89,17 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
+import kotlin.math.pow
 
 fun getDeviceColor(state: WledState?, realtimeColor: Int?, savedColor: Int?): Color {
     val stateColor = state?.segments?.firstOrNull()?.colors?.firstOrNull()?.toArgb()
     val colorInt = realtimeColor ?: stateColor ?: savedColor ?: 0xFFFF5722.toInt()
-    return Color(colorInt)
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(colorInt, hsv)
+    // On force la valeur (intensité/noir) à 1.0f pour que la tuile soit toujours colorée et vive
+    hsv[2] = 1f
+    return Color(android.graphics.Color.HSVToColor(hsv))
 }
 
 @Composable
@@ -228,25 +237,28 @@ fun BrightnessSlider(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     var isDragging by remember { mutableStateOf(false) }
-    var targetValue by remember { mutableStateOf(brightness.toFloat()) }
+    
+    // On utilise une courbe quadratique (x^2) pour que la luminosité basse soit plus précise
+    // tout en évitant les valeurs nulles trop longues de la courbe cubique
+    var targetValue by remember { mutableStateOf(kotlin.math.sqrt(brightness / 255.0).toFloat()) }
     var updateJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val currentBrightness by androidx.compose.runtime.rememberUpdatedState(brightness)
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        targetValue = brightness.toFloat()
+        targetValue = kotlin.math.sqrt(brightness / 255.0).toFloat()
     }
 
     LaunchedEffect(brightness) {
         if (!isDragging && updateJob == null) {
-            targetValue = brightness.toFloat()
+            targetValue = kotlin.math.sqrt(brightness / 255.0).toFloat()
         }
     }
 
     val animatedValue by animateFloatAsState(
         targetValue = targetValue,
         label = "brightness",
-        animationSpec = if (isDragging) tween(0) else spring(
+        animationSpec = spring(
             dampingRatio = 0.65f,
             stiffness = Spring.StiffnessMedium
         )
@@ -255,16 +267,16 @@ fun BrightnessSlider(
     var lastHapticBrightness by remember { mutableStateOf(brightness) }
 
     Slider(
-        value = animatedValue,
+        value = if (isDragging) targetValue else animatedValue,
         enabled = enabled,
         onValueChange = { newValue ->
             isDragging = true
             updateJob?.cancel()
             updateJob = null
             targetValue = newValue
-            onBrightnessChange(newValue.toInt(), true)
+            val intValue = (newValue.toDouble().pow(2.0) * 255.0).roundToInt().coerceIn(0, 255)
+            onBrightnessChange(intValue, true)
 
-            val intValue = newValue.toInt()
             if (onHapticFeedback != null && intValue != lastHapticBrightness) {
                 lastHapticBrightness = intValue
                 onHapticFeedback()
@@ -272,18 +284,20 @@ fun BrightnessSlider(
         },
         onValueChangeFinished = {
             isDragging = false
-            onBrightnessChange(targetValue.toInt(), false)
+            val intValue = (targetValue.toDouble().pow(2.0) * 255.0).roundToInt().coerceIn(0, 255)
+            onBrightnessChange(intValue, false)
 
             updateJob?.cancel()
             updateJob = scope.launch {
                 delay(2000)
                 updateJob = null
-                if (currentBrightness.toFloat() != targetValue) {
-                    targetValue = currentBrightness.toFloat()
+                val expectedTarget = kotlin.math.sqrt(currentBrightness / 255.0).toFloat()
+                if (expectedTarget != targetValue) {
+                    targetValue = expectedTarget
                 }
             }
         },
-        valueRange = 1f..255f,
+        valueRange = 0f..1f,
         modifier = modifier.fillMaxWidth(),
         interactionSource = interactionSource,
         colors = SliderDefaults.colors(
@@ -294,6 +308,233 @@ fun BrightnessSlider(
             inactiveTickColor = baseColor.copy(alpha = 0.3f)
         )
     )
+}
+
+@Composable
+fun RgbSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    var targetValue by remember { mutableStateOf(value) }
+    var isDragging by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    
+    LaunchedEffect(value) {
+        if (!isDragging && value != targetValue) {
+            targetValue = value
+        }
+    }
+
+    val animatedValue by animateFloatAsState(
+        targetValue = targetValue,
+        label = "rgb",
+        animationSpec = spring(
+            dampingRatio = 0.65f,
+            stiffness = Spring.StiffnessMedium
+        )
+    )
+    
+    val currentDisplayValue = if (isDragging) targetValue else animatedValue
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(28.dp)
+    ) {
+        Canvas(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val trackHeight = 12.dp.toPx()
+            val cornerRadius = trackHeight / 2
+            val thumbRadius = 10.dp.toPx()
+            
+            // Background track (full width, rounded)
+            drawRoundRect(
+                color = Color.Black.copy(alpha = 0.3f),
+                topLeft = Offset(0f, (size.height - trackHeight) / 2),
+                size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+            )
+            
+            // Colored portion (from start to current value)
+            val thumbX = (currentDisplayValue / 255f) * size.width
+            if (currentDisplayValue > 0) {
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.Black.copy(alpha = 0f), color),
+                        endX = thumbX
+                    ),
+                    topLeft = Offset(0f, (size.height - trackHeight) / 2),
+                    size = androidx.compose.ui.geometry.Size(thumbX, trackHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                )
+            }
+            
+            // Draw larger round thumb
+            val thumbY = size.height / 2
+            
+            // Shadow
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.2f),
+                radius = thumbRadius + 2.dp.toPx(),
+                center = Offset(thumbX, thumbY + 1.dp.toPx())
+            )
+            
+            // Colored circle
+            drawCircle(
+                color = color,
+                radius = thumbRadius,
+                center = Offset(thumbX, thumbY)
+            )
+        }
+        
+        Slider(
+            value = currentDisplayValue,
+            onValueChange = { newValue ->
+                isDragging = true
+                targetValue = newValue
+                onValueChange(newValue)
+            },
+            onValueChangeFinished = {
+                isDragging = false
+            },
+            valueRange = 0f..255f,
+            modifier = Modifier.fillMaxWidth(),
+            interactionSource = interactionSource,
+            colors = SliderDefaults.colors(
+                thumbColor = color.copy(alpha = 0f),
+                activeTrackColor = color.copy(alpha = 0f),
+                inactiveTrackColor = color.copy(alpha = 0f)
+            )
+        )
+    }
+}
+
+@Composable
+fun ColorSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    baseColor: Color,
+    startColor: Color = Color.Black.copy(alpha = 0f),
+    endColor: Color = baseColor,
+    drawFullTrackGradient: Boolean = false,
+    interpolationCurve: (Float) -> Float = { it },
+    thumbColor: Color? = null,
+    modifier: Modifier = Modifier
+) {
+    var targetValue by remember { mutableStateOf(value) }
+    var isDragging by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(value) {
+        if (!isDragging && value != targetValue) {
+            targetValue = value
+        }
+    }
+
+    val animatedValue by animateFloatAsState(
+        targetValue = targetValue,
+        label = "colorSlider",
+        animationSpec = spring(
+            dampingRatio = 0.65f,
+            stiffness = Spring.StiffnessMedium
+        )
+    )
+    
+    val currentDisplayValue = if (isDragging) targetValue else animatedValue
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(28.dp)
+    ) {
+        Canvas(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val trackHeight = 12.dp.toPx()
+            val cornerRadius = trackHeight / 2
+            val thumbRadius = 10.dp.toPx()
+            
+            // Background track (full width, rounded)
+            if (drawFullTrackGradient) {
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(startColor, endColor),
+                        startX = 0f,
+                        endX = size.width
+                    ),
+                    topLeft = Offset(0f, (size.height - trackHeight) / 2),
+                    size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                )
+            } else {
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.3f),
+                    topLeft = Offset(0f, (size.height - trackHeight) / 2),
+                    size = androidx.compose.ui.geometry.Size(size.width, trackHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                )
+            }
+            
+            // Colored portion (from start to current value)
+            val thumbX = (currentDisplayValue / 255f) * size.width
+            if (!drawFullTrackGradient && currentDisplayValue > 0) {
+                drawRoundRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(startColor, endColor),
+                        endX = thumbX
+                    ),
+                    topLeft = Offset(0f, (size.height - trackHeight) / 2),
+                    size = androidx.compose.ui.geometry.Size(thumbX, trackHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius)
+                )
+            }
+            
+            // Draw larger round thumb
+            val thumbY = size.height / 2
+            
+            // Shadow
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.2f),
+                radius = thumbRadius + 2.dp.toPx(),
+                center = Offset(thumbX, thumbY + 1.dp.toPx())
+            )
+            
+            // Colored circle
+            val currentThumbColor = thumbColor ?: if (drawFullTrackGradient) {
+                androidx.compose.ui.graphics.lerp(startColor, endColor, currentDisplayValue / 255f)
+            } else {
+                baseColor
+            }
+            
+            drawCircle(
+                color = currentThumbColor,
+                radius = thumbRadius,
+                center = Offset(thumbX, thumbY)
+            )
+        }
+        
+        Slider(
+            value = currentDisplayValue,
+            onValueChange = { newValue ->
+                isDragging = true
+                targetValue = newValue
+                onValueChange(newValue)
+            },
+            onValueChangeFinished = {
+                isDragging = false
+            },
+            valueRange = 0f..255f,
+            modifier = Modifier.fillMaxWidth(),
+            interactionSource = remember { MutableInteractionSource() },
+            colors = SliderDefaults.colors(
+                thumbColor = baseColor.copy(alpha = 0f),
+                activeTrackColor = baseColor.copy(alpha = 0f),
+                inactiveTrackColor = baseColor.copy(alpha = 0f)
+            )
+        )
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -339,6 +580,7 @@ fun DeviceCard(
             .then(
                 if (isOled) Modifier.border(1.dp, baseColor, RoundedCornerShape(24.dp)) else Modifier
             )
+            .clip(RoundedCornerShape(24.dp))
             .then(
                 if (isOnline) {
                     Modifier.combinedClickable(
@@ -540,11 +782,28 @@ fun ColorWheel(
     onHueChange: (Float) -> Unit,
     saturation: Float,
     onSaturationChange: (Float) -> Unit,
+    value: Float = 1f,
     modifier: Modifier = Modifier,
     onInteractionStart: () -> Unit = {},
     onInteractionEnd: () -> Unit = {}
 ) {
     var isDragging by remember { mutableStateOf(false) }
+
+    val angleRad = hue * PI.toFloat() / 180f
+    val targetNx = (kotlin.math.cos(angleRad) * saturation).toFloat()
+    val targetNy = (kotlin.math.sin(angleRad) * saturation).toFloat()
+
+    val animatedNx by animateFloatAsState(
+        targetValue = targetNx,
+        label = "nx",
+        animationSpec = if (isDragging) tween(0) else spring(dampingRatio = 1f, stiffness = 400f)
+    )
+
+    val animatedNy by animateFloatAsState(
+        targetValue = targetNy,
+        label = "ny",
+        animationSpec = if (isDragging) tween(0) else spring(dampingRatio = 1f, stiffness = 400f)
+    )
 
     Canvas(
         modifier = modifier
@@ -562,12 +821,10 @@ fun ColorWheel(
                         val radius = minOf(size.width, size.height) / 2f
                         val distance = hypot(dx, dy)
                         
-                        if (distance <= radius) {
-                            var angle = atan2(dy, dx) * 180f / PI.toFloat()
-                            if (angle < 0) angle += 360f
-                            onHueChange(angle)
-                            onSaturationChange((distance / radius).coerceIn(0f, 1f))
-                        }
+                        var angle = atan2(dy, dx) * 180f / PI.toFloat() + 90f
+                        if (angle < 0) angle += 360f
+                        onHueChange(angle)
+                        onSaturationChange((distance / radius).coerceIn(0f, 1f))
                     }
                 )
             }
@@ -586,13 +843,14 @@ fun ColorWheel(
                         onInteractionEnd() 
                     }
                 ) { change, _ ->
+                    change.consume()
                     val center = Offset(size.width / 2f, size.height / 2f)
                     val dx = change.position.x - center.x
                     val dy = change.position.y - center.y
                     val radius = minOf(size.width, size.height) / 2f
                     val distance = hypot(dx, dy)
                     
-                    var angle = atan2(dy, dx) * 180f / PI.toFloat()
+                    var angle = atan2(dy, dx) * 180f / PI.toFloat() + 90f
                     if (angle < 0) angle += 360f
                     onHueChange(angle)
                     onSaturationChange((distance / radius).coerceIn(0f, 1f))
@@ -602,53 +860,59 @@ fun ColorWheel(
         val radius = minOf(size.width, size.height) / 2f
         val center = Offset(size.width / 2f, size.height / 2f)
 
-        // Draw color wheel background (Sweep Gradient)
-        val sweepColors = listOf(
-            Color.Red,
-            Color.Yellow,
-            Color.Green,
-            Color.Cyan,
-            Color.Blue,
-            Color.Magenta,
-            Color.Red
-        )
+        rotate(-90f, center) {
+            // Draw color wheel background (Sweep Gradient)
+            val sweepColors = listOf(
+                Color.Red,
+                Color.Yellow,
+                Color.Green,
+                Color.Cyan,
+                Color.Blue,
+                Color.Magenta,
+                Color.Red
+            )
+            
+            drawCircle(
+                brush = Brush.sweepGradient(sweepColors, center = center),
+                radius = radius,
+                center = center
+            )
+            
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color.White, Color.White.copy(alpha = 0f)),
+                    center = center,
+                    radius = radius
+                ),
+                radius = radius,
+                center = center
+            )
 
-        drawCircle(
-            brush = Brush.sweepGradient(sweepColors, center = center),
-            radius = radius,
-            center = center
-        )
-        
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color.White, Color.White.copy(alpha = 0f)),
-                center = center,
-                radius = radius
-            ),
-            radius = radius,
-            center = center
-        )
+            // Draw thumb indicator
+            val thumbX = center.x + animatedNx * radius
+            val thumbY = center.y + animatedNy * radius
 
-        // Draw thumb indicator
-        val angleRad = hue * PI.toFloat() / 180f
-        val thumbDistance = saturation * radius
-        val thumbX = center.x + cos(angleRad) * thumbDistance
-        val thumbY = center.y + sin(angleRad) * thumbDistance
-
-        drawCircle(
-            color = Color.Black.copy(alpha = 0.2f),
-            radius = 14.dp.toPx(),
-            center = Offset(thumbX, thumbY)
-        )
-        drawCircle(
-            color = Color.White,
-            radius = 12.dp.toPx(),
-            center = Offset(thumbX, thumbY)
-        )
-        drawCircle(
-            color = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, 1f))),
-            radius = 10.dp.toPx(),
-            center = Offset(thumbX, thumbY)
-        )
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.2f),
+                radius = 12.dp.toPx(),
+                center = Offset(thumbX, thumbY)
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 10.dp.toPx(),
+                center = Offset(thumbX, thumbY)
+            )
+            
+            val currentSat = hypot(animatedNx, animatedNy).coerceIn(0f, 1f)
+            var currentHue = (atan2(animatedNy, animatedNx) * 180f / PI.toFloat())
+            if (currentHue < 0) currentHue += 360f
+            
+            drawCircle(
+                color = Color(android.graphics.Color.HSVToColor(floatArrayOf(currentHue, currentSat, value))),
+                radius = 8.dp.toPx(),
+                center = Offset(thumbX, thumbY)
+            )
+        }
     }
 }
+

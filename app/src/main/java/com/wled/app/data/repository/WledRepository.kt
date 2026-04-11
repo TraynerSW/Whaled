@@ -30,6 +30,7 @@ class WledRepository(private val context: Context) {
     val devices: StateFlow<List<WledDevice>> = _devices.asStateFlow()
 
     private val _deviceStates = MutableStateFlow<Map<String, WledState>>(emptyMap())
+    private val lastInteractionTimes = mutableMapOf<String, Long>()
     val deviceStates: StateFlow<Map<String, WledState>> = _deviceStates
 
     private val _deviceEffects = MutableStateFlow<Map<String, List<String>>>(emptyMap())
@@ -119,7 +120,7 @@ class WledRepository(private val context: Context) {
         withContext(Dispatchers.IO) {
             _devices.value.forEach { device ->
                 try {
-                    if (device.ip == recentlyToggledDevice) return@forEach
+                    if (device.ip == recentlyToggledDevice || (System.currentTimeMillis() - (lastInteractionTimes[device.ip] ?: 0L) < 500L)) return@forEach
                     val state = apiService.getState(device.ip, device.port)
                     if (state != null) {
                         _deviceStates.value = _deviceStates.value + (device.ip to state)
@@ -175,7 +176,7 @@ class WledRepository(private val context: Context) {
     }
 
     private suspend fun fetchDeviceState(device: WledDevice) {
-        if (device.ip == recentlyToggledDevice) return
+        if (device.ip == recentlyToggledDevice || (System.currentTimeMillis() - (lastInteractionTimes[device.ip] ?: 0L) < 500L)) return
         withContext(Dispatchers.IO) {
             val state = apiService.getState(device.ip, device.port)
             if (state != null) {
@@ -217,6 +218,7 @@ class WledRepository(private val context: Context) {
 
     fun togglePower() {
         val device = _selectedDevice.value ?: return
+        lastInteractionTimes[device.ip] = System.currentTimeMillis()
         val currentState = _deviceStates.value[device.ip] ?: return
         val newState = !currentState.isOn
 
@@ -253,11 +255,12 @@ class WledRepository(private val context: Context) {
 
     fun setBrightness(brightness: Int, isDragging: Boolean = false) {
         val device = _selectedDevice.value ?: return
+        lastInteractionTimes[device.ip] = System.currentTimeMillis()
         val currentState = _deviceStates.value[device.ip] ?: return
 
         // Throttle state updates during drag to avoid heavy UI stutter (max 100 fps)
         val currentTime = System.currentTimeMillis()
-        if (!isDragging || currentTime - lastBrightnessSentTime > 10) {
+        if (!isDragging || currentTime - lastBrightnessSentTime > 5) {
             val newDeviceStates = _deviceStates.value.mapValues { (ip, state) ->
                 if (ip == device.ip) {
                     state.copy(brightness = brightness)
@@ -284,7 +287,7 @@ class WledRepository(private val context: Context) {
                     withContext(Dispatchers.IO) {
                         apiService.setBrightness(device.ip, device.port, brightness, currentState.isOn)
                     }
-                    kotlinx.coroutines.delay(10) // Keep the job active for 10ms to block new calls
+                    kotlinx.coroutines.delay(5) // Keep the job active for 10ms to block new calls
                 }
             }
         }
@@ -297,12 +300,13 @@ class WledRepository(private val context: Context) {
         val g = (color shr 8) and 0xFF
         val b = color and 0xFF
         val currentState = _deviceStates.value[ip]
+        lastInteractionTimes[ip] = System.currentTimeMillis()
         val brightness = currentState?.brightness ?: 128
         val currentlyOn = currentState?.isOn ?: true
 
         setColorJobs[ip]?.cancel()
         setColorJobs[ip] = scope.launch {
-            delay(10)
+            delay(5)
             withContext(Dispatchers.IO) {
                 apiService.setColor(ip, 80, r, g, b, brightness, currentlyOn)
             }
@@ -462,7 +466,23 @@ class WledRepository(private val context: Context) {
         }
     }
 
-    fun setEffect(ip: String, effectId: Int) {
+    fun setWhiteTemperature(ip: String, cct: Int) {
+        lastInteractionTimes[ip] = System.currentTimeMillis()
+        val device = _devices.value.find { it.ip == ip } ?: return
+        
+        setColorJobs[ip]?.cancel()
+        setColorJobs[ip] = scope.launch {
+            try {
+                apiService.setWhiteTemperature(ip, 80, cct)
+                fetchDeviceState(device)
+            } catch (e: Exception) {
+                // Silently fail if network request fails
+            }
+        }
+    }
+
+fun setEffect(ip: String, effectId: Int) {
+        lastInteractionTimes[ip] = System.currentTimeMillis()
         scope.launch {
             withContext(Dispatchers.IO) {
                 apiService.setEffect(ip, 80, effectId)
@@ -471,6 +491,7 @@ class WledRepository(private val context: Context) {
     }
 
     fun setPreset(ip: String, presetId: Int) {
+        lastInteractionTimes[ip] = System.currentTimeMillis()
         scope.launch {
             withContext(Dispatchers.IO) {
                 apiService.setPreset(ip, 80, presetId)

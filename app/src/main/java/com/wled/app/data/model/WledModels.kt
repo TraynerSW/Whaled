@@ -49,6 +49,7 @@ data class WledSegment(
     val currentPalette: Int = 0,
     val speed: Int = 128,
     val intensity: Int = 128,
+    val cct: Int = 128,
     val colors: List<WledColor> = emptyList(),
     val isSelected: Boolean = false
 )

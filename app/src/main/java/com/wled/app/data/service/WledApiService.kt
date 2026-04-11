@@ -95,6 +95,7 @@ private fun parseState(jsonString: String): WledState {
                 currentPalette = seg.get("pal")?.asInt ?: 0,
                 speed = seg.get("speed")?.asInt ?: 128,
                 intensity = seg.get("int")?.asInt ?: 128,
+                cct = seg.get("cct")?.asInt ?: 128,
                 colors = colors,
                 isSelected = seg.get("sel")?.asBoolean ?: false
             ))
@@ -115,7 +116,11 @@ private fun parseState(jsonString: String): WledState {
         sendCommand(ip, port, """{"on":$currentlyOn,"bri":$brightness,"seg":[{"col":[[$r,$g,$b]]}]}""")
     }
 
-    suspend fun updateSegment(ip: String, port: Int, segmentId: Int, start: Int, stop: Int, name: String?): Boolean = withContext(Dispatchers.IO) {
+        suspend fun setWhiteTemperature(ip: String, port: Int, cct: Int): Boolean = withContext(Dispatchers.IO) {
+        sendCommand(ip, port, """{"seg":[{"cct":$cct}]}""")
+    }
+
+suspend fun updateSegment(ip: String, port: Int, segmentId: Int, start: Int, stop: Int, name: String?): Boolean = withContext(Dispatchers.IO) {
         val namePart = if (name != null) ""","n":"$name"""" else ""
         sendCommand(ip, port, """{"seg":[{"id":$segmentId,"start":$start,"stop":$stop$namePart}]}""")
     }

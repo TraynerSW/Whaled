@@ -1,4 +1,5 @@
 package com.wled.app.ui.screens
+import androidx.compose.ui.unit.dp
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
@@ -9,6 +10,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -22,10 +26,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.BackHandler
 import com.wled.app.data.model.WledDevice
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,15 +41,30 @@ fun WledWebViewScreen(
     onNavigateBack: () -> Unit
 ) {
     var reloadTrigger by remember { mutableIntStateOf(0) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var canGoBack by remember { mutableStateOf(false) }
+
+    val handleBack: () -> Unit = {
+        if (canGoBack && webViewRef?.canGoBack() == true) {
+            webViewRef?.goBack()
+        } else {
+            onNavigateBack()
+        }
+    }
+
+    BackHandler(enabled = true) {
+        handleBack()
+    }
 
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color.Transparent,
+        containerColor = MaterialTheme.colorScheme.background,
 
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text(device.name) },
+                windowInsets = androidx.compose.foundation.layout.WindowInsets(top = 44.dp),
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = handleBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour")
                     }
                 },
@@ -53,7 +74,7 @@ fun WledWebViewScreen(
                     }
                 },
                 colors = androidx.compose.material3.TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    containerColor = MaterialTheme.colorScheme.background,
 
                     navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
                     actionIconContentColor = MaterialTheme.colorScheme.onSurface
@@ -61,13 +82,20 @@ fun WledWebViewScreen(
             )
         }
     ) { paddingValues ->
-        WledWebView(
-            url = device.url,
-            reloadTrigger = reloadTrigger,
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-        )
+                .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+        ) {
+            WledWebView(
+                url = device.url,
+                reloadTrigger = reloadTrigger,
+                onWebViewCreated = { webViewRef = it },
+                onHistoryChanged = { canGoBack = it },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 
@@ -76,6 +104,8 @@ fun WledWebViewScreen(
 fun WledWebView(
     url: String,
     reloadTrigger: Int,
+    onWebViewCreated: (WebView) -> Unit = {},
+    onHistoryChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var lastTrigger by remember { mutableIntStateOf(reloadTrigger) }
@@ -103,6 +133,14 @@ fun WledWebView(
                     override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                         super.onPageStarted(view, url, favicon)
                     }
+                    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                        onHistoryChanged(view?.canGoBack() == true)
+                        super.doUpdateVisitedHistory(view, url, isReload)
+                    }
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        onHistoryChanged(view?.canGoBack() == true)
+                        super.onPageFinished(view, url)
+                    }
                 }
                 
                 webChromeClient = object : WebChromeClient() {
@@ -111,6 +149,7 @@ fun WledWebView(
                     }
                 }
                 
+                onWebViewCreated(this)
                 loadUrl(url)
             }
         },
