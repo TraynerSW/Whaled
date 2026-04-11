@@ -1,0 +1,91 @@
+   800	                                FlowRow(
+   801	                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+   802	                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+   803	                                ) {
+   804	                                    presetColors.forEach { color ->
+   805	                                        Box(
+   806	                                            modifier = Modifier
+   807	                                                .width(42.dp)
+   808	                                                .height(36.dp)
+   809	                                                .clip(CircleShape)
+   810	                                                .then(
+   811	                                                    if (color == Color.Transparent) {
+   812	                                                        Modifier.background(
+   813	                                                            androidx.compose.ui.graphics.Brush.linearGradient(
+   814	                                                                listOf(Color.Red, Color.Yellow, Color.Green, Color.Cyan, Color.Blue, Color.Magenta, Color.Red)
+   815	                                                            )
+   816	                                                        )
+   817	                                                    } else if (color == Color(0xFF000000) || color == Color.Black) {
+   818	                                                        Modifier.background(color).border(1.dp, Color.White, CircleShape)
+   819	                                                    } else {
+   820	                                                        Modifier.background(color)
+   821	                                                    }
+   822	                                                )
+   823	                                                .clickable {
+   824	                                                    notifyInteractionStart()
+   825	                                                    if (color == Color.Transparent) {
+   826	                                                        // Générer une couleur aléatoire
+   827	                                                        val randomHue = (0..360).random().toFloat()
+   828	                                                        val randomSat = kotlin.random.Random.nextFloat() // 0f à 1f
+   829	                                                        // On garde l'intensité (selectedValue) actuelle
+   830	                                                        val randomColor = Color(android.graphics.Color.HSVToColor(floatArrayOf(randomHue, randomSat, selectedValue)))
+   831	                                                        selectedHue = randomHue
+   832	                                                        selectedSaturation = randomSat
+   833	                                                        repository.setColor(device.ip, randomColor.toArgb())
+   834	                                                    } else {
+   835	                                                        val hsv = FloatArray(3)
+   836	                                                        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+   837	                                                        selectedHue = hsv[0]
+   838	                                                        selectedSaturation = hsv[1]
+   839	                                                        selectedValue = hsv[2].coerceAtLeast(0.1f)
+   840	                                                        repository.setColor(device.ip, color.toArgb())
+   841	                                                    }
+   842	                                                    notifyInteractionEnd()
+   843	                                                },
+   844	                                            contentAlignment = Alignment.Center
+   845	                                        ) {
+   846	                                        }
+   847	                                    }
+   848	                                }
+   849	                            }
+   850	                            
+   851	                            if (showCustomColors) {
+   852	                                FlowRow(
+   853	                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+   854	                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+   855	                                ) {
+   856	                                    customColors.forEach { color ->
+   857	                                        Box(
+   858	                                            modifier = Modifier
+   859	                                                .width(42.dp)
+   860	                                                .height(36.dp)
+   861	                                                .clip(CircleShape)
+   862	                                                .background(color)
+   863	                                                .combinedClickable(
+   864	                                                    onClick = {
+   865	                                                        notifyInteractionStart()
+   866	                                                        val hsv = FloatArray(3)
+   867	                                                        android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+   868	                                                        selectedHue = hsv[0]
+   869	                                                        selectedSaturation = hsv[1]
+   870	                                                        selectedValue = hsv[2].coerceAtLeast(0.1f)
+   871	                                                        repository.setColor(device.ip, color.toArgb())
+   872	                                                        notifyInteractionEnd()
+   873	                                                    },
+   874	                                                    onLongClick = {
+   875	                                                        colorToDelete = color
+   876	                                                    }
+   877	                                                )
+   878	                                        )
+   879	                                    }
+   880	
+   881	                                    Box(
+   882	                                        modifier = Modifier
+   883	                                            .width(42.dp)
+   884	                                            .height(36.dp)
+   885	                                            .clip(CircleShape)
+   886	                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+   887	                                            .clickable {
+   888	                                                val c = Color(
+   889	                                                    android.graphics.Color.HSVToColor(
+   890	                                                        floatArrayOf(selectedHue, selectedSaturation, 1f)

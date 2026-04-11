@@ -1,4 +1,6 @@
 package com.wled.app.ui.screens
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.unit.sp
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -220,6 +222,7 @@ fun WledControlScreen(
     var isAddingSegment by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val sharedPrefs = context.getSharedPreferences("wled_custom_colors", Context.MODE_PRIVATE)
     var showColorSettingsDialog by remember { mutableStateOf(false) }
     var isSettingsDialogVisible by remember { mutableStateOf(false) }
@@ -443,15 +446,13 @@ fun WledControlScreen(
         val basePrimary = MaterialTheme.colorScheme.primary
         val hsv = FloatArray(3)
         android.graphics.Color.colorToHSV(basePrimary.toArgb(), hsv)
-        // Rendre la couleur Material You plus colorée (+50% saturation) et plus foncée (-30% luminosité)
-        hsv[1] = (hsv[1] * 1.5f).coerceAtMost(1f)
-        hsv[2] = (hsv[2] * 0.7f).coerceAtMost(1f)
-        val vividDarkPrimary = Color(android.graphics.Color.HSVToColor(hsv))
+        hsv[1] = 1f // Saturation maximale
+        hsv[2] = 1f // Luminosité maximale
+        val vividPrimary = Color(android.graphics.Color.HSVToColor(hsv))
         
-        val isLightTheme = MaterialTheme.colorScheme.surface.luminance() > 0.5f
         val switchColors = androidx.compose.material3.SwitchDefaults.colors(
-            checkedThumbColor = if (isLightTheme) vividDarkPrimary else Color.White,
-            checkedTrackColor = vividDarkPrimary.copy(alpha = 0.5f),
+            checkedThumbColor = Color.White,
+            checkedTrackColor = vividPrimary,
             checkedBorderColor = Color.Transparent
         )
 
@@ -468,7 +469,7 @@ fun WledControlScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(24.dp)) {
-                        Text("Affichage", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(bottom = 16.dp))
+                        
                         
                         Text("Curseurs", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -508,7 +509,7 @@ fun WledControlScreen(
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("Couleurs (prédéfinies)")
+                            Text("Couleurs (de base)")
                             Switch(
                                 checked = showPresetColors,
                                 onCheckedChange = { showPresetColors = it; sharedPrefs.edit().putBoolean("show_preset_colors", it).apply() },
@@ -516,7 +517,7 @@ fun WledControlScreen(
                             )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                            Text("Couleurs (personnalisées)")
+                            Text("Couleurs (perso)")
                             Switch(
                                 checked = showCustomColors,
                                 onCheckedChange = { showCustomColors = it; sharedPrefs.edit().putBoolean("show_custom_colors", it).apply() },
@@ -549,6 +550,7 @@ fun WledControlScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+        modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) },
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
 
         topBar = {
@@ -722,7 +724,7 @@ fun WledControlScreen(
                                 mutableStateOf(String.format("#%02X%02X%02X", r, g, b))
                             }
                             
-                            OutlinedTextField(
+                            androidx.compose.foundation.text.BasicTextField(
                                 value = hexText,
                                 onValueChange = { 
                                     hexText = it.uppercase()
@@ -743,14 +745,23 @@ fun WledControlScreen(
                                         }
                                     }
                                 },
-                                modifier = Modifier.width(150.dp).height(56.dp),
+                                modifier = Modifier
+                                    .width(110.dp)
+                                    .height(48.dp)
+                                    .border(1.dp, displayColor, RoundedCornerShape(16.dp))
+                                    .padding(horizontal = 8.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center, 
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp
+                                ),
                                 singleLine = true,
-                                textStyle = androidx.compose.ui.text.TextStyle(textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontWeight = FontWeight.Bold),
-                                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = displayColor,
-                                    focusedLabelColor = displayColor,
-                                    cursorColor = displayColor
-                                )
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        innerTextField()
+                                    }
+                                }
                             )
                             
                             Spacer(modifier = Modifier.height(12.dp))
@@ -801,10 +812,21 @@ com.wled.app.ui.components.ColorSlider(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     presetColors.forEach { color ->
+                                        val isSelected = remember(selectedHue, selectedSaturation, color) {
+                                            if (color == Color.Transparent) false
+                                            else {
+                                                val c = Color(android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, 1f)))
+                                                color.red == c.red && color.green == c.green && color.blue == c.blue
+                                            }
+                                        }
                                         Box(
                                             modifier = Modifier
                                                 .width(42.dp)
                                                 .height(36.dp)
+                                                .then(
+                                                    if (isSelected) Modifier.border(2.dp, if (color == Color(0xFF000000) || color == Color.Black) Color.White else color, CircleShape).padding(3.dp)
+                                                    else Modifier
+                                                )
                                                 .clip(CircleShape)
                                                 .then(
                                                     if (color == Color.Transparent) {
@@ -853,10 +875,18 @@ com.wled.app.ui.components.ColorSlider(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     customColors.forEach { color ->
+                                        val isSelected = remember(selectedHue, selectedSaturation, color) {
+                                            val c = Color(android.graphics.Color.HSVToColor(floatArrayOf(selectedHue, selectedSaturation, 1f)))
+                                            color.red == c.red && color.green == c.green && color.blue == c.blue
+                                        }
                                         Box(
                                             modifier = Modifier
                                                 .width(42.dp)
                                                 .height(36.dp)
+                                                .then(
+                                                    if (isSelected) Modifier.border(2.dp, color, CircleShape).padding(3.dp)
+                                                    else Modifier
+                                                )
                                                 .clip(CircleShape)
                                                 .background(color)
                                                 .combinedClickable(
